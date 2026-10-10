@@ -1,0 +1,72 @@
+# ========================================================
+# Vault Git Ignore Configuration
+# ========================================================
+
+# --------------------------------------------------------
+# 1. USER NOTES & PERSONAL DATA (CRITICAL: NEVER COMMIT NOTES)
+# --------------------------------------------------------
+VaultSample/
+VaultData/
+default_vault/
+my-vault/
+nodes/
+attachments/
+backups/
+exports/
+metadata/
+.vault-cache/
+.vault-config.yaml
+*.vault*
+*.vault-backup.zip
+
+# --------------------------------------------------------
+# 2. Python Virtual Environment & Caches
+# --------------------------------------------------------
+venv/
+.venv/
+env/
+*/venv/
+*/.venv/
+__pycache__/
+*/__pycache__/
+*/*/__pycache__/
+*.py[cod]
+*$py.class
+*.pytest_cache/
+*/.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# --------------------------------------------------------
+# 3. Node.js & Frontend Artifacts
+# --------------------------------------------------------
+node_modules/
+*/node_modules/
+dist/
+dist-ssr/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.eslintcache
+.stylelintcache
+
+# --------------------------------------------------------
+# 4. SQLite & Database Files
+# --------------------------------------------------------
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# --------------------------------------------------------
+# 5. OS & IDE Metadata
+# --------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo
