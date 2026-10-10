@@ -10,8 +10,9 @@ Vault is a production-quality, local-first personal knowledge management applica
 
 ## Quick Start (One-Click)
 
-- **First-Time Setup & Launch:** Double-click [`start.bat`](start.bat) (or run `./start.ps1`) in the root directory.
-  - Automatically installs dependencies, builds the frontend, starts the local server, and opens `http://127.0.0.1:8000`.
+- **Launch Vault:** Double-click [`start.bat`](start.bat) (or run `./start.ps1`) in the root directory.
+  - Automatically installs dependencies on first run, builds the frontend, starts the local server, and opens `http://127.0.0.1:8000`.
+- **Stop Server:** Double-click [`stop.bat`](stop.bat) (or run `./stop.ps1`) in the root directory.
 - **Manual Setup Only:** Double-click [`setup.bat`](setup.bat) (or run `./setup.ps1`).
 
 ---
@@ -20,6 +21,7 @@ Vault is a production-quality, local-first personal knowledge management applica
 
 - **Application Directory:** [`vault-app/`](vault-app/)
 - **Launch Script:** [`start.bat`](start.bat) (PowerShell: [`start.ps1`](start.ps1))
+- **Stop Script:** [`stop.bat`](stop.bat) (PowerShell: [`stop.ps1`](stop.ps1))
 - **Setup Script:** [`setup.bat`](setup.bat) (PowerShell: [`setup.ps1`](setup.ps1))
 - **Test Runner:** [`vault-app/scripts/test.bat`](vault-app/scripts/test.bat) (PowerShell: [`test.ps1`](vault-app/scripts/test.ps1))
 - **Benchmark Utility:** [`vault-app/scripts/benchmark.py`](vault-app/scripts/benchmark.py)
