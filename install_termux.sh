@@ -52,8 +52,8 @@ if command -v pkg >/dev/null 2>&1; then
     log_info "Updating package lists via pkg..."
     pkg update -y || apt-get update -y
 
-    log_info "Installing Python, Node.js, and native build dependencies..."
-    pkg install -y python nodejs-lts git clang make libffi libxml2 libxslt curl termux-tools || apt-get install -y python nodejs git clang make libffi libxml2 libxslt curl
+    log_info "Installing Python, Node.js, Rust, and native build dependencies..."
+    pkg install -y python nodejs-lts git clang make libffi libxml2 libxslt libyaml rust binutils curl termux-tools || apt-get install -y python nodejs git clang make libffi libxml2 libxslt libyaml rust binutils curl
 else
     log_warn "pkg package manager not found. Assuming prerequisites are already installed."
 fi
@@ -69,17 +69,25 @@ fi
 log_ok "Python virtual environment ready."
 
 log_step "[3/5] Installing backend Python packages..."
-"$VENV_PIP" install --upgrade pip wheel setuptools --quiet
+"$VENV_PIP" install --upgrade pip wheel setuptools maturin --quiet
 
-# Install requirements (safely handling playwright which is not available for Android ARM)
-if grep -q "playwright" "$BACKEND_DIR/requirements.txt"; then
-    log_info "Installing requirements (filtering platform-specific Playwright for Android)..."
-    grep -v "^playwright" "$BACKEND_DIR/requirements.txt" > "$BACKEND_DIR/requirements-termux.tmp"
-    "$VENV_PIP" install -r "$BACKEND_DIR/requirements-termux.tmp" --quiet
-    rm -f "$BACKEND_DIR/requirements-termux.tmp"
-else
-    "$VENV_PIP" install -r "$BACKEND_DIR/requirements.txt" --quiet
+# Ensure pydantic-core is installed (using prebuilt Android wheels or native Rust fallback)
+log_info "Checking pydantic-core installation for Android..."
+if ! "$VENV_PYTHON" -c "import pydantic_core" >/dev/null 2>&1; then
+    log_info "Installing pydantic-core (trying precompiled Android wheels first)..."
+    if ! "$VENV_PIP" install pydantic-core --extra-index-url https://eutalix.github.io/android-pydantic-core/ --quiet; then
+        log_warn "Precompiled wheel not found for this Python version; compiling via native Termux Rust (may take 2-5 minutes)..."
+        "$VENV_PIP" install --no-build-isolation pydantic-core
+    fi
 fi
+
+# Prepare Android-compatible requirements:
+# 1. Strip playwright (Chromium headless is not supported on Android ARM)
+# 2. Use standard uvicorn instead of uvicorn[standard] (uvloop does not support Android bionic libc)
+log_info "Installing backend dependencies from requirements.txt..."
+sed -e 's/uvicorn\[standard\]/uvicorn/g' -e '/^playwright/d' "$BACKEND_DIR/requirements.txt" > "$BACKEND_DIR/requirements-termux.tmp"
+"$VENV_PIP" install -r "$BACKEND_DIR/requirements-termux.tmp"
+rm -f "$BACKEND_DIR/requirements-termux.tmp"
 log_ok "Backend dependencies installed successfully."
 
 # 4. Frontend Dependencies & Build
