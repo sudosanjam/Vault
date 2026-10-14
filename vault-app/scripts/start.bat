@@ -1,44 +1,15 @@
 @echo off
-setlocal enabledelayedexpansion
+setlocal
+cd /d "%~dp0"
 
-set "SCRIPT_DIR=%~dp0"
-set "PROJECT_ROOT=%SCRIPT_DIR%.."
-set "BACKEND_DIR=%PROJECT_ROOT%\backend"
-set "PYTHON_EXE=%BACKEND_DIR%\venv\Scripts\python.exe"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0start.ps1" %*
+set "EXIT_CODE=%ERRORLEVEL%"
 
-if not exist "%PYTHON_EXE%" (
-    set "PYTHON_EXE=python"
+if %EXIT_CODE% neq 0 (
+    echo.
+    echo ========================================================
+    echo [ERROR] Vault server stopped with an error (Code: %EXIT_CODE%).
+    echo ========================================================
+    pause
+    exit /b %EXIT_CODE%
 )
-
-if "%VAULT_DIRECTORY%"=="" (
-    if exist "%PROJECT_ROOT%\..\VaultSample" (
-        set "VAULT_DIRECTORY=%PROJECT_ROOT%\..\VaultSample"
-    ) else (
-        set "VAULT_DIRECTORY=%PROJECT_ROOT%\..\VaultData"
-    )
-)
-
-
-if "%HOST%"=="" (
-    set "HOST=127.0.0.1"
-)
-
-if "%PORT%"=="" (
-    set "PORT=8000"
-)
-
-echo ========================================================
-echo                    VAULT SYSTEM                        
-echo   Local-First Personal Knowledge Graph and PKM         
-echo ========================================================
-echo Active Vault Root : %VAULT_DIRECTORY%
-echo Listening Address : http://%HOST%:%PORT%
-echo Network Isolation : Loopback Only (Zero Cloud)
-echo ========================================================
-echo.
-
-start "" "http://%HOST%:%PORT%"
-
-cd /d "%BACKEND_DIR%"
-"%PYTHON_EXE%" -m uvicorn app.main:app --host %HOST% --port %PORT% --log-level info
-pause

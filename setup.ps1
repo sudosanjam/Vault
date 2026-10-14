@@ -7,4 +7,4 @@ if (-not (Test-Path $SetupScript)) {
     exit 1
 }
 
-& $SetupScript
+& $SetupScript @args

@@ -1,28 +1,15 @@
 @echo off
-setlocal enabledelayedexpansion
+setlocal
+cd /d "%~dp0"
 
-echo ========================================================
-echo                    VAULT - Launching                    
-echo ========================================================
-echo.
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0vault-app\scripts\start.ps1" %*
+set "EXIT_CODE=%ERRORLEVEL%"
 
-set "ROOT_DIR=%~dp0"
-set "SCRIPTS_DIR=%ROOT_DIR%vault-app\scripts"
-set "BACKEND_VENV=%ROOT_DIR%vault-app\backend\venv"
-set "FRONTEND_DIST=%ROOT_DIR%vault-app\frontend\dist"
-
-:: Check if initial setup is needed
-if not exist "%BACKEND_VENV%\Scripts\python.exe" (
-    echo [!] First-time setup detected. Virtual environment not found.
-    echo Running automated setup...
+if %EXIT_CODE% neq 0 (
     echo.
-    call "%ROOT_DIR%setup.bat"
-)
-
-if not exist "%SCRIPTS_DIR%\start.bat" (
-    echo [ERROR] Could not find vault-app\scripts\start.bat
+    echo ========================================================
+    echo [ERROR] Vault server stopped with an error (Code: %EXIT_CODE%).
+    echo ========================================================
     pause
-    exit /b 1
+    exit /b %EXIT_CODE%
 )
-
-call "%SCRIPTS_DIR%\start.bat"

@@ -2,7 +2,7 @@
 
 from pathlib import Path
 from typing import List, Optional
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 
 
@@ -31,10 +31,11 @@ class Settings(BaseSettings):
     DEFAULT_AUTOSAVE_DEBOUNCE_MS: int = 2000
     DEFAULT_BACKUP_RETENTION: int = 10
     
-    class Config:
-        env_prefix = "VAULT_"
-        env_file = ".env"
-        extra = "ignore"
+    model_config = SettingsConfigDict(
+        env_prefix="VAULT_",
+        env_file=".env",
+        extra="ignore"
+    )
 
 
 settings = Settings()

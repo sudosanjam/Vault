@@ -20,33 +20,37 @@
 
 ## Quickstart
 
-### Prerequisites
+### Prerequisites (Auto-Installed if Missing)
 - Python 3.10+ (Tested on Python 3.13)
 - Node.js 18+ & npm
+*(On a clean Windows or Linux machine, the launch and setup scripts detect missing prerequisites and install them automatically!)*
 
-### Automated Setup
-In PowerShell or Windows Command Prompt:
+### One-Click Launch (Windows)
+Double-click `start.bat` in the repository root (or run in PowerShell):
 ```powershell
-# In PowerShell:
-.\scripts\setup.ps1
-
-# Or in Windows CMD:
-scripts\setup.bat
+.\start.ps1
 ```
-This script will:
-1. Create a Python virtual environment in `backend/venv` and install backend dependencies.
-2. Install headless Chromium via Playwright for PDF export.
-3. Install frontend npm dependencies and compile the production client bundle into `frontend/dist`.
+This single script will:
+1. Verify Python and Node.js/npm (automatically installing them if missing).
+2. Set up the Python virtual environment and install backend requirements.
+3. Install headless Chromium via Playwright for PDF export.
+4. Install frontend npm dependencies and compile the production bundle.
+5. Launch the local FastAPI server and open `http://127.0.0.1:8000` in your default browser.
 
-### Starting Vault
-```powershell
-# In PowerShell:
-.\scripts\start.ps1
-
-# Or in Windows CMD:
-scripts\start.bat
+### One-Click Launch (Linux)
+Run the single all-in-one script:
+```bash
+chmod +x start.sh && ./start.sh
 ```
-Your browser will automatically open to `http://127.0.0.1:8000`.
+This automatically detects your Linux distribution package manager (`apt`, `dnf`, `yum`, `pacman`, `zypper`, `apk`), installs required system packages, builds frontend assets, and launches the server.
+
+### Manual Setup Only (Without Starting Server)
+- **Windows:** Double-click `setup.bat` or run `.\setup.ps1`
+- **Linux:** Run `./start.sh --setup-only` or `./setup.sh`
+
+### Stopping Vault Server
+- **Windows:** Double-click `stop.bat` or run `.\stop.ps1`
+- **Linux:** Run `./stop.sh`
 
 ---
 

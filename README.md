@@ -10,20 +10,42 @@ Vault is a production-quality, local-first personal knowledge management applica
 
 ## Quick Start (One-Click)
 
-- **Launch Vault:** Double-click [`start.bat`](start.bat) (or run `./start.ps1`) in the root directory.
-  - Automatically installs dependencies on first run, builds the frontend, starts the local server, and opens `http://127.0.0.1:8000`.
-- **Stop Server:** Double-click [`stop.bat`](stop.bat) (or run `./stop.ps1`) in the root directory.
-- **Manual Setup Only:** Double-click [`setup.bat`](setup.bat) (or run `./setup.ps1`).
+### Windows
+- **Launch Vault:** Double-click [`start.bat`](start.bat) (or run `.\start.ps1` in PowerShell).
+  - Automatically verifies all prerequisites (Python 3.10+, Node.js 18+, npm).
+  - If any requirement is missing on a fresh Windows install, **it is automatically installed**.
+  - Configures the Python virtualenv, installs backend packages, installs Playwright Chromium, builds the frontend SPA, launches the server, and automatically opens `http://127.0.0.1:8000`.
+- **Stop Server:** Double-click [`stop.bat`](stop.bat) (or run `.\stop.ps1`).
+- **Setup Only (Without Starting):** Double-click [`setup.bat`](setup.bat) (or run `.\setup.ps1`).
+
+### Linux
+- **Launch Vault (All-In-One Script):** Run [`./start.sh`](start.sh)
+  ```bash
+  chmod +x start.sh && ./start.sh
+  ```
+  - Automatically detects Linux distribution (`apt`, `dnf`, `yum`, `pacman`, `zypper`, `apk`).
+  - Checks and automatically installs missing system packages (`python3`, `python3-venv`, `python3-pip`, `nodejs`, `npm`, `curl`).
+  - Configures the environment, builds the production frontend, launches the server, and opens your browser.
+- **Stop Server:** Run [`./stop.sh`](stop.sh)
+- **Setup Only:** Run [`./start.sh --setup-only`](start.sh) or [`./setup.sh`](setup.sh)
 
 ---
 
 ## Quick Navigation
 
 - **Application Directory:** [`vault-app/`](vault-app/)
-- **Launch Script:** [`start.bat`](start.bat) (PowerShell: [`start.ps1`](start.ps1))
-- **Stop Script:** [`stop.bat`](stop.bat) (PowerShell: [`stop.ps1`](stop.ps1))
-- **Setup Script:** [`setup.bat`](setup.bat) (PowerShell: [`setup.ps1`](setup.ps1))
-- **Test Runner:** [`vault-app/scripts/test.bat`](vault-app/scripts/test.bat) (PowerShell: [`test.ps1`](vault-app/scripts/test.ps1))
+- **Launch Scripts:**
+  - Windows: [`start.bat`](start.bat) / [`start.ps1`](start.ps1)
+  - Linux: [`start.sh`](start.sh)
+- **Stop Scripts:**
+  - Windows: [`stop.bat`](stop.bat) / [`stop.ps1`](stop.ps1)
+  - Linux: [`stop.sh`](stop.sh)
+- **Setup Scripts (Manual/Prerequisites Only):**
+  - Windows: [`setup.bat`](setup.bat) / [`setup.ps1`](setup.ps1)
+  - Linux: [`setup.sh`](setup.sh) (or `./start.sh --setup-only`)
+- **Test Runners:**
+  - Windows: [`vault-app/scripts/test.bat`](vault-app/scripts/test.bat) / [`test.ps1`](vault-app/scripts/test.ps1)
+  - Linux: [`vault-app/scripts/test.sh`](vault-app/scripts/test.sh)
 - **Benchmark Utility:** [`vault-app/scripts/benchmark.py`](vault-app/scripts/benchmark.py)
 
 ---

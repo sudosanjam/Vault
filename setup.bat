@@ -1,20 +1,22 @@
 @echo off
-setlocal enabledelayedexpansion
+setlocal
+cd /d "%~dp0"
 
-echo ========================================================
-echo                 VAULT - One-Click Setup                
-echo ========================================================
-echo.
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0vault-app\scripts\setup.ps1" %*
+set "EXIT_CODE=%ERRORLEVEL%"
 
-set "ROOT_DIR=%~dp0"
-set "SCRIPTS_DIR=%ROOT_DIR%vault-app\scripts"
-
-if not exist "%SCRIPTS_DIR%\setup.bat" (
-    echo [ERROR] Could not find vault-app\scripts\setup.bat
-    echo Please make sure you are running this from the repository root.
+if %EXIT_CODE% neq 0 (
+    echo.
+    echo ========================================================
+    echo [ERROR] Vault setup encountered an error (Code: %EXIT_CODE%).
+    echo ========================================================
     pause
-    exit /b 1
+    exit /b %EXIT_CODE%
+) else (
+    echo.
+    echo ========================================================
+    echo [SUCCESS] Vault setup completed successfully!
+    echo Double-click start.bat to launch Vault.
+    echo ========================================================
+    pause
 )
-
-echo Starting environment setup...
-call "%SCRIPTS_DIR%\setup.bat"
