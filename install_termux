@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Termux One-Click Runner Wrapper
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "$SCRIPT_DIR/install_termux.sh" "$@"

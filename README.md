@@ -29,6 +29,21 @@ Vault is a production-quality, local-first personal knowledge management applica
 - **Stop Server:** Run [`./stop.sh`](stop.sh)
 - **Setup Only:** Run [`./start.sh --setup-only`](start.sh) or [`./setup.sh`](setup.sh)
 
+### Android (Termux)
+- **One-Click Install & Run:** Run [`./install_termux`](install_termux) (or [`./install_termux.sh`](install_termux.sh))
+  ```bash
+  pkg update && pkg install git
+  git clone https://github.com/sudosanjam/Vault.git
+  cd Vault
+  chmod +x install_termux install_termux.sh start_termux.sh stop_termux.sh
+  ./install_termux
+  ```
+  - Automatically installs Termux Python, Node.js LTS, and native compiler packages.
+  - Prepares virtualenv and compiles production frontend SPA.
+  - Launches Vault on `127.0.0.1:8000` and automatically opens Chrome or your default Android browser.
+- **Start Later:** Run [`./start_termux.sh`](start_termux.sh)
+- **Stop Server:** Run [`./stop_termux.sh`](stop_termux.sh)
+
 ---
 
 ## Quick Navigation
@@ -37,12 +52,15 @@ Vault is a production-quality, local-first personal knowledge management applica
 - **Launch Scripts:**
   - Windows: [`start.bat`](start.bat) / [`start.ps1`](start.ps1)
   - Linux: [`start.sh`](start.sh)
+  - Android (Termux): [`install_termux`](install_termux) / [`start_termux.sh`](start_termux.sh)
 - **Stop Scripts:**
   - Windows: [`stop.bat`](stop.bat) / [`stop.ps1`](stop.ps1)
   - Linux: [`stop.sh`](stop.sh)
+  - Android (Termux): [`stop_termux.sh`](stop_termux.sh)
 - **Setup Scripts (Manual/Prerequisites Only):**
   - Windows: [`setup.bat`](setup.bat) / [`setup.ps1`](setup.ps1)
   - Linux: [`setup.sh`](setup.sh) (or `./start.sh --setup-only`)
+  - Android (Termux): [`install_termux.sh`](install_termux.sh)
 - **Test Runners:**
   - Windows: [`vault-app/scripts/test.bat`](vault-app/scripts/test.bat) / [`test.ps1`](vault-app/scripts/test.ps1)
   - Linux: [`vault-app/scripts/test.sh`](vault-app/scripts/test.sh)

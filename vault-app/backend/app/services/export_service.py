@@ -13,7 +13,11 @@ import zipfile
 
 import markdown
 from jinja2 import Template
-from playwright.sync_api import sync_playwright
+
+try:
+    from playwright.sync_api import sync_playwright
+except (ImportError, Exception):
+    sync_playwright = None
 
 from app.core.frontmatter import parse_note_content
 from app.core.links import extract_attachment_paths, extract_internal_links
@@ -387,6 +391,11 @@ class ExportService:
         self, notes: List[Dict[str, Any]], doc_title: str, req: ExportRequest, safe_title: str, now_str: str
     ) -> ExportResult:
         """Generate PDF using Playwright Chromium local renderer."""
+        if sync_playwright is None:
+            raise RuntimeError(
+                "PDF export requires Playwright Chromium, which is not available in this environment (e.g. Android/Termux). "
+                "Please export your notes as HTML, Markdown ZIP, or JSON bundle instead."
+            )
         scoped_ids = {n["id"] for n in notes}
         
         # Prepare notes with rendered HTML

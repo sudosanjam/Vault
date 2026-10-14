@@ -1,5 +1,6 @@
 # Ensure shell scripts always maintain Unix LF line endings across all platforms
 *.sh text eol=lf
+install_termux text eol=lf
 
 # Windows scripts maintain CRLF
 *.bat text eol=crlf

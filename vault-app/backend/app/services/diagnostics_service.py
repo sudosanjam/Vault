@@ -124,6 +124,14 @@ class DiagnosticsService:
             newest = max(backups, key=lambda p: p.stat().st_mtime)
             last_backup_date = newest.name
 
+        # Dynamic Playwright check
+        has_playwright = False
+        try:
+            import importlib.util
+            has_playwright = importlib.util.find_spec("playwright") is not None
+        except Exception:
+            has_playwright = False
+
         return SystemDiagnostics(
             app_name="Vault",
             app_version="1.0.0",
@@ -138,8 +146,8 @@ class DiagnosticsService:
             orphaned_attachments_count=orphaned_count,
             database_size_bytes=db_size,
             disk_free_bytes=disk_free,
-            pdf_renderer_available=True,
-            pdf_renderer_name="Playwright Chromium",
+            pdf_renderer_available=has_playwright,
+            pdf_renderer_name="Playwright Chromium" if has_playwright else "Not Available (Android/Minimal)",
             last_backup_date=last_backup_date,
             backup_count=backup_count,
             issues=issues,
