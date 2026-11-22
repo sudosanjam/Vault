@@ -1,13 +1,12 @@
-"""LAN Sync API endpoints — allows Android/Termux clients to pull Vault notes over local network."""
+"""LAN Sync API endpoints — bidirectional pull/push of Vault notes over local network."""
 
 import hashlib
-import os
 import socket
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
@@ -156,3 +155,80 @@ def get_note_raw(
         return md_file.read_text(encoding="utf-8")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Could not read note: {e}")
+
+
+# ─── Push endpoints (Termux → Desktop) ───────────────────────────────────────
+
+@router.post("/push/note")
+async def push_note(
+    note_id: str = Form(...),
+    content: str = Form(...),
+    services: ServiceContainer = Depends(get_services),
+) -> Dict[str, Any]:
+    """
+    Receive a note pushed from an Android/Termux client and save it to the desktop vault.
+    The client sends the note_id and raw markdown content (including YAML frontmatter).
+    Uses last-write-wins: if the same note was modified on both sides, the pushed version wins.
+    """
+    notes_dir = services.vault.root_path / "nodes"
+    notes_dir.mkdir(parents=True, exist_ok=True)
+
+    # Sanitize note_id to prevent path traversal
+    safe_id = Path(note_id).name
+    if not safe_id or safe_id.startswith("."):
+        raise HTTPException(status_code=400, detail="Invalid note_id.")
+
+    md_file = notes_dir / f"{safe_id}.md"
+    existed = md_file.exists()
+    old_hash = _md5_file(md_file) if existed else ""
+
+    md_file.write_text(content, encoding="utf-8")
+    new_hash = _md5_file(md_file)
+
+    action = "updated" if existed else "created"
+    return {
+        "status": "ok",
+        "action": action,
+        "note_id": safe_id,
+        "changed": old_hash != new_hash,
+    }
+
+
+@router.post("/push/image")
+async def push_image(
+    file: UploadFile = File(...),
+    services: ServiceContainer = Depends(get_services),
+) -> Dict[str, Any]:
+    """
+    Receive an image pushed from an Android/Termux client and save it to the desktop vault.
+    Preserves the original filename; skips write if file content is identical (hash match).
+    """
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Filename missing.")
+
+    images_dir = services.vault.attachments_dir / "images"
+    images_dir.mkdir(parents=True, exist_ok=True)
+
+    # Sanitize filename
+    safe_name = Path(file.filename).name
+    if not safe_name or safe_name.startswith("."):
+        raise HTTPException(status_code=400, detail="Invalid filename.")
+
+    data = await file.read()
+    local_path = images_dir / safe_name
+    existed = local_path.exists()
+    old_hash = _md5_file(local_path) if existed else ""
+    new_hash = hashlib.md5(data).hexdigest()
+
+    if old_hash == new_hash:
+        return {"status": "ok", "action": "skipped", "filename": safe_name, "changed": False}
+
+    local_path.write_bytes(data)
+    action = "updated" if existed else "created"
+    return {
+        "status": "ok",
+        "action": action,
+        "filename": safe_name,
+        "changed": True,
+        "size_bytes": len(data),
+    }
