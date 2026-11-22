@@ -314,5 +314,34 @@ export const api = {
     fetchJson<{ status: string; message: string; output?: string }>(`${API_BASE}/system/apply-update`, {
       method: 'POST',
     }),
+
+  // LAN Sync
+  getSyncInfo: () =>
+    fetchJson<{
+      vault_name: string;
+      lan_enabled: boolean;
+      server_ip: string;
+      port: number;
+      vault_path: string;
+      app: string;
+    }>(`${API_BASE}/sync/info`),
+  updateSyncConfig: (lan_enabled: boolean, lan_port: number = 8000) =>
+    fetchJson<{ status: string; lan_enabled: boolean; lan_port: number; message: string }>(
+      `${API_BASE}/sync/config`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lan_enabled, lan_port }),
+      }
+    ),
+  getSyncManifest: () =>
+    fetchJson<{
+      vault_name: string;
+      generated_at: string;
+      notes_count: number;
+      attachments_count: number;
+      notes: { id: string; filename: string; file_hash: string; modified_at: string; size_bytes: number }[];
+      attachments: { name: string; relative_path: string; file_hash: string; modified_at: string; size_bytes: number }[];
+    }>(`${API_BASE}/sync/manifest`),
 };
 

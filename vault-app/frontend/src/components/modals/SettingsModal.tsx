@@ -14,6 +14,9 @@ import {
   GitBranch,
   DownloadCloud,
   Check,
+  Wifi,
+  Copy,
+  WifiOff,
 } from 'lucide-react';
 
 interface SettingsModalProps {
@@ -38,7 +41,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // Update checking state
+  // ── Update checking state ─────────────────────────────────────────────────
   const [autoCheckUpdates, setAutoCheckUpdates] = useState<boolean>(true);
   const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -52,16 +55,37 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
   } | null>(null);
   const [updateStatusMsg, setUpdateStatusMsg] = useState<string | null>(null);
 
+  // ── LAN Sync state ────────────────────────────────────────────────────────
+  const [lanEnabled, setLanEnabled] = useState<boolean>(false);
+  const [lanIp, setLanIp] = useState<string>('');
+  const [lanPort, setLanPort] = useState<number>(8000);
+  const [isTogglingLan, setIsTogglingLan] = useState(false);
+  const [lanCopied, setLanCopied] = useState(false);
+  const [lanManifest, setLanManifest] = useState<{ notes_count: number; attachments_count: number } | null>(null);
+
   useEffect(() => {
     if (isModalOpen && vaultInfo) {
       setVaultPathInput(vaultInfo.vault_path);
       setError(null);
       setSuccessMsg(null);
-      // Fetch current config for update setting
+
+      // Fetch update preference
       api.getConfig().then(res => {
         if (res.config && typeof res.config.auto_check_updates === 'boolean') {
           setAutoCheckUpdates(res.config.auto_check_updates);
         }
+      }).catch(() => {});
+
+      // Fetch LAN sync info
+      api.getSyncInfo().then(res => {
+        setLanEnabled(res.lan_enabled ?? false);
+        setLanIp(res.server_ip ?? '');
+        setLanPort(res.port ?? 8000);
+      }).catch(() => {});
+
+      // Fetch manifest summary for status display
+      api.getSyncManifest().then(res => {
+        setLanManifest({ notes_count: res.notes_count, attachments_count: res.attachments_count });
       }).catch(() => {});
     }
   }, [isModalOpen, vaultInfo]);
@@ -110,6 +134,33 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
       setError('Update failed: ' + (err.message || 'Unknown error'));
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  const handleToggleLan = async (enabled: boolean) => {
+    setIsTogglingLan(true);
+    setError(null);
+    try {
+      await api.updateSyncConfig(enabled, lanPort);
+      setLanEnabled(enabled);
+      setSuccessMsg(
+        enabled
+          ? 'LAN sync enabled — restart Vault for the network binding to take effect.'
+          : 'LAN sync disabled.'
+      );
+    } catch (e: any) {
+      setError('Failed to toggle LAN mode: ' + (e.message || 'Unknown error'));
+    } finally {
+      setIsTogglingLan(false);
+    }
+  };
+
+  const handleCopyLanAddress = () => {
+    if (lanIp) {
+      navigator.clipboard.writeText(`${lanIp}:${lanPort}`).then(() => {
+        setLanCopied(true);
+        setTimeout(() => setLanCopied(false), 2000);
+      });
     }
   };
 
@@ -287,7 +338,114 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
           </div>
         </div>
 
-        {/* 3. Active Vault Path Switcher */}
+        {/* 3. LAN Sync Section */}
+        <div className="space-y-3 pt-4 border-t border-vault-200 dark:border-vault-800">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-semibold text-vault-400 uppercase tracking-wider flex items-center gap-1.5">
+              <Wifi className="w-3.5 h-3.5 text-teal-400" /> Local Network Sync
+            </label>
+            <div className="flex items-center gap-2">
+              <label htmlFor="lan-toggle" className="text-xs text-vault-600 dark:text-vault-400 cursor-pointer">
+                Enable LAN access
+              </label>
+              <button
+                id="lan-toggle"
+                type="button"
+                role="switch"
+                aria-checked={lanEnabled}
+                onClick={() => handleToggleLan(!lanEnabled)}
+                disabled={isTogglingLan}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] focus:ring-offset-1 focus:ring-offset-vault-900 ${
+                  lanEnabled ? 'bg-teal-500' : 'bg-vault-700'
+                } disabled:opacity-50`}
+              >
+                <span
+                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                    lanEnabled ? 'translate-x-4' : 'translate-x-0.5'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-vault-50 dark:bg-vault-850/70 border border-vault-200 dark:border-vault-800 space-y-3">
+            {/* Header row */}
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+              <div className="flex-1">
+                <div className="text-xs font-semibold text-vault-900 dark:text-vault-100 flex items-center gap-2">
+                  Sync to Android / Termux
+                  {lanManifest && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-400 font-mono">
+                      {lanManifest.notes_count} notes · {lanManifest.attachments_count} images
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-vault-400 mt-0.5">
+                  Enable LAN access, then run{' '}
+                  <code className="bg-vault-800/60 px-1.5 py-0.5 rounded text-teal-400 font-mono text-[10px]">
+                    ./sync.sh {lanIp || '192.168.x.x'}
+                  </code>{' '}
+                  from Termux to pull all your notes over Wi-Fi.
+                </p>
+              </div>
+              {lanIp && (
+                <button
+                  type="button"
+                  onClick={handleCopyLanAddress}
+                  title="Copy server address"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border border-vault-700 hover:border-teal-500/50 bg-vault-800/50 hover:bg-vault-800 text-vault-300 hover:text-teal-300 transition-all duration-150 shrink-0 self-start"
+                >
+                  {lanCopied ? <Check size={12} className="text-teal-400" /> : <Copy size={12} />}
+                  <span className="font-mono">{lanCopied ? 'Copied!' : `${lanIp}:${lanPort}`}</span>
+                </button>
+              )}
+            </div>
+
+            {/* Status banner */}
+            {lanEnabled && lanIp ? (
+              <div className="p-2.5 rounded-xl bg-teal-500/10 border border-teal-500/20 text-[11px] text-teal-300 space-y-1.5">
+                <div className="flex items-center gap-1.5 font-semibold text-teal-400">
+                  <Wifi size={12} className="shrink-0" />
+                  LAN mode active — this Vault is accessible on your local network
+                </div>
+                <div className="font-mono text-teal-300/80">
+                  http://{lanIp}:{lanPort}
+                </div>
+                <div className="text-teal-300/60 leading-relaxed">
+                  <span className="font-medium text-teal-300/80">Termux one-liner:</span>{' '}
+                  <code className="font-mono text-[10px] bg-teal-900/40 px-1.5 py-0.5 rounded">
+                    ./sync.sh {lanIp} {lanPort} ~/vault-sync --watch
+                  </code>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-start gap-2 p-2.5 rounded-xl bg-vault-800/30 border border-vault-700/40 text-[11px] text-vault-500">
+                <WifiOff size={13} className="shrink-0 mt-0.5 text-vault-600" />
+                <span>
+                  LAN sync is <span className="font-semibold text-vault-400">disabled</span>.
+                  Toggle the switch above and restart Vault to allow Android/Termux access over Wi-Fi.
+                </span>
+              </div>
+            )}
+
+            {/* Quick setup guide */}
+            <details className="group">
+              <summary className="text-[11px] text-vault-500 hover:text-vault-300 cursor-pointer select-none flex items-center gap-1 transition-colors">
+                <span className="group-open:rotate-90 inline-block transition-transform duration-150">▶</span>
+                Quick setup guide for Termux
+              </summary>
+              <div className="mt-2 pl-3 border-l border-vault-700/40 space-y-1 text-[11px] text-vault-500">
+                <div>1. Install Python in Termux: <code className="bg-vault-800/60 px-1 rounded text-teal-400 font-mono">pkg install python</code></div>
+                <div>2. Find your desktop IP: run <code className="bg-vault-800/60 px-1 rounded text-teal-400 font-mono">ipconfig</code> (Windows) in cmd</div>
+                <div>3. Enable LAN access here and restart Vault</div>
+                <div>4. In Termux, run: <code className="bg-vault-800/60 px-1 rounded text-teal-400 font-mono">./sync.sh &lt;desktop-ip&gt;</code></div>
+                <div className="pt-1 text-vault-600">Both devices must be on the same Wi-Fi network. All data stays local — zero cloud.</div>
+              </div>
+            </details>
+          </div>
+        </div>
+
+        {/* 4. Active Vault Path Switcher */}
         <div className="space-y-3 pt-4 border-t border-vault-200 dark:border-vault-800">
           <label className="text-xs font-semibold text-vault-400 uppercase tracking-wider flex items-center gap-1.5">
             <FolderOpen className="w-3.5 h-3.5 text-emerald-400" /> Active Vault Directory
@@ -311,7 +469,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
           </form>
         </div>
 
-        {/* 4. Architecture and System Mode */}
+        {/* 5. Architecture and System Mode */}
         <div className="space-y-3 pt-4 border-t border-vault-200 dark:border-vault-800">
           <label className="text-xs font-semibold text-vault-400 uppercase tracking-wider flex items-center gap-1.5">
             <Monitor className="w-3.5 h-3.5 text-purple-400" /> Architecture & Capabilities
@@ -327,11 +485,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
             </div>
             <div>
               <span className="text-vault-400 block text-[10px] uppercase">Executable Suite:</span>
-              <span className="font-semibold text-emerald-400">setup.exe • vault.exe • update.exe</span>
+              <span className="font-semibold text-emerald-400">setup.exe · vault.exe · update.exe</span>
             </div>
             <div>
               <span className="text-vault-400 block text-[10px] uppercase">Network Mode:</span>
-              <span className="font-semibold text-emerald-400">Zero Cloud / Loopback Only</span>
+              <span className={`font-semibold ${lanEnabled ? 'text-teal-400' : 'text-emerald-400'}`}>
+                {lanEnabled ? `LAN — ${lanIp}:${lanPort}` : 'Zero Cloud / Loopback Only'}
+              </span>
             </div>
           </div>
         </div>
