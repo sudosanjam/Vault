@@ -21,8 +21,7 @@ CYAN='\033[0;36m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
-GRAY='\033[0;90m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 log_step() { echo -e "\n${YELLOW}>>> $1${NC}"; }
 log_ok()   { echo -e "${GREEN}[OK] $1${NC}"; }
@@ -50,46 +49,101 @@ fi
 log_step "[1/5] Checking and installing Termux packages..."
 if command -v pkg > /dev/null 2>&1; then
     log_info "Updating package lists via pkg..."
-    pkg update -y || apt-get update -y
+    pkg update -y 2>/dev/null || apt-get update -y 2>/dev/null || true
 
-    log_info "Installing Python, Node.js, Rust, and native build dependencies..."
-    pkg install -y python nodejs-lts git clang make libffi libxml2 libxslt libyaml rust binutils curl termux-tools || \
-        apt-get install -y python nodejs git clang make libffi libxml2 libxslt libyaml rust binutils curl
+    log_info "Installing Python, Node.js, and native build dependencies..."
+    pkg install -y python nodejs-lts git clang make libffi libxml2 libxslt libyaml rust binutils curl termux-tools 2>/dev/null || \
+        apt-get install -y python nodejs git clang make libffi libxml2 libxslt libyaml rust binutils curl 2>/dev/null || true
 else
     log_warn "pkg package manager not found. Assuming prerequisites are already installed."
 fi
 
-log_ok "Termux system packages ready: Python $(python3 --version 2>&1), Node.js $(node -v 2>&1)"
+PYTHON_VER=$(python3 --version 2>&1)
+log_ok "Termux system packages ready: $PYTHON_VER, Node.js $(node -v 2>&1)"
 
 # 3. Setup Python Virtual Environment
 log_step "[2/5] Setting up Python virtual environment in backend/venv..."
+
+# ── The Python 3.14 pip bug ────────────────────────────────────────────────────
+# Python 3.14 introduced an import-prevention hook inside pip that raises:
+#   ImportError: No module named 'pip._internal.operations.install.wheel'
+# when ANY pip install is attempted — including upgrading pip itself.
+# This affects the pip bundled inside the venv by python3 -m venv.
+#
+# Root fix: create the venv WITHOUT pip (--without-pip), then bootstrap a
+# FRESH pip using get-pip.py downloaded from PyPA. This gives us a clean pip
+# that doesn't have the broken hook baked in.
+# ─────────────────────────────────────────────────────────────────────────────
+
+_bootstrap_pip() {
+    local GET_PIP_URL="https://bootstrap.pypa.io/get-pip.py"
+    local GET_PIP_PATH="$VENV_DIR/get-pip.py"
+
+    log_info "Bootstrapping fresh pip via get-pip.py..."
+    if command -v curl > /dev/null 2>&1; then
+        curl -fsSL "$GET_PIP_URL" -o "$GET_PIP_PATH"
+    elif command -v wget > /dev/null 2>&1; then
+        wget -qO "$GET_PIP_PATH" "$GET_PIP_URL"
+    else
+        log_err "Neither curl nor wget found. Install one: pkg install curl"
+        exit 1
+    fi
+
+    "$VENV_PYTHON" "$GET_PIP_PATH" --quiet
+    rm -f "$GET_PIP_PATH"
+
+    # Verify pip works
+    if "$VENV_PIP" --version > /dev/null 2>&1; then
+        log_ok "pip $($VENV_PIP --version | awk '{print $2}') bootstrapped successfully"
+    else
+        log_err "pip bootstrap failed — try: pkg install python && ./install_termux.sh"
+        exit 1
+    fi
+
+    # Now safe to upgrade (bootstrap pip doesn't have the broken hook)
+    "$VENV_PIP" install --upgrade pip wheel setuptools --quiet
+    log_ok "pip, wheel, setuptools up to date"
+}
+
+NEEDS_BOOTSTRAP=false
+
 if [ ! -f "$VENV_PYTHON" ]; then
-    log_info "Creating virtualenv at $VENV_DIR..."
-    python3 -m venv "$VENV_DIR"
+    log_info "Creating virtual environment (without bundled pip)..."
+    # --without-pip avoids installing the broken Python 3.14 bundled pip
+    python3 -m venv --without-pip "$VENV_DIR"
+    NEEDS_BOOTSTRAP=true
 fi
-log_ok "Python virtual environment ready."
+
+# If the venv exists but pip is broken, re-bootstrap
+if [ "$NEEDS_BOOTSTRAP" = false ] && ! "$VENV_PIP" --version > /dev/null 2>&1; then
+    log_warn "Existing pip in venv is broken — re-bootstrapping..."
+    NEEDS_BOOTSTRAP=true
+fi
+
+# If pip exists but throws the operations.install.wheel error, re-bootstrap
+if [ "$NEEDS_BOOTSTRAP" = false ]; then
+    if ! "$VENV_PIP" list > /dev/null 2>&1; then
+        log_warn "Venv pip reports errors — re-bootstrapping..."
+        NEEDS_BOOTSTRAP=true
+    fi
+fi
+
+if [ "$NEEDS_BOOTSTRAP" = true ]; then
+    _bootstrap_pip
+fi
+
+log_ok "Python virtual environment ready ($("$VENV_PYTHON" --version 2>&1))"
 
 # ─── Backend Python packages ──────────────────────────────────────────────────
 log_step "[3/5] Installing backend Python packages..."
 
-# ── Step 3a: Upgrade pip first ───────────────────────────────────────────────
-# Python 3.14 ships with a pip that has a known internal module regression
-# when maturin tries to install build dependencies (pip._internal.operations.install.wheel
-# import path changed). Upgrading pip to 24.x+ fixes this before anything else.
-log_info "Upgrading pip, wheel, and setuptools..."
-"$VENV_PIP" install --upgrade pip wheel setuptools --quiet
-log_ok "pip $(\"$VENV_PIP\" --version | awk '{print $2}') ready"
-
-# ── Step 3b: pydantic-core (the tricky one on Android) ───────────────────────
-# Install strategy (fastest-to-slowest fallback):
-#   1. Pre-built Android/ARM64 wheel from community indexes → instant, no Rust needed
-#   2. Build from source using the system Rust toolchain    → ~5-8 min, no pip-maturin needed
+# ── pydantic-core for Android/ARM ─────────────────────────────────────────────
+# Install strategy (fastest → slowest):
+#   1. Pre-built Android/ARM wheel from community indexes → instant, no Rust
+#   2. Build from source using system Rust toolchain     → ~5-10 min
 #
-# We do NOT install maturin via pip because:
-#   - maturin's own build backend tries to pip-install setuptools-rust which triggers
-#     the broken pip._internal.operations.install.wheel import on Python 3.14
-#   - `pkg install rust` already gives us the Rust toolchain; pydantic-core's
-#     pyproject.toml supports --no-build-isolation with just the system Rust
+# --no-build-isolation is key: it uses system Rust directly without pip needing
+# to install maturin (which also hits the Python 3.14 pip bug).
 log_info "Checking pydantic-core for Android/ARM..."
 if ! "$VENV_PYTHON" -c "import pydantic_core" > /dev/null 2>&1; then
     log_info "pydantic-core not installed — trying pre-built Android wheels..."
@@ -98,7 +152,7 @@ if ! "$VENV_PYTHON" -c "import pydantic_core" > /dev/null 2>&1; then
     for INDEX_URL in \
         "https://eutalix.github.io/android-pydantic-core/" \
         "https://termux-python.github.io/termux-wheels/"; do
-        log_info "  Trying index: $INDEX_URL"
+        log_info "  Trying: $INDEX_URL"
         if "$VENV_PIP" install pydantic-core \
             --extra-index-url "$INDEX_URL" --quiet 2>/dev/null; then
             PYDANTIC_OK=true
@@ -108,18 +162,16 @@ if ! "$VENV_PYTHON" -c "import pydantic_core" > /dev/null 2>&1; then
     done
 
     if [ "$PYDANTIC_OK" = false ]; then
-        log_warn "No pre-built wheel found — compiling pydantic-core from source."
-        log_warn "This uses the system Rust toolchain (no maturin pip install needed)."
-        log_warn "Estimated time: 5-10 minutes. Keep Termux open and plugged in."
-        # CARGO_NET_GIT_FETCH_WITH_CLI avoids git2 build issues in Termux
+        log_warn "No pre-built wheel found — building pydantic-core from source via system Rust."
+        log_warn "This may take 5-10 minutes. Keep Termux open and plugged in."
         CARGO_NET_GIT_FETCH_WITH_CLI=true \
             "$VENV_PIP" install --no-build-isolation pydantic-core
         PYDANTIC_OK=true
     fi
 
-    if [ "$PYDANTIC_OK" = false ]; then
+    if ! "$VENV_PYTHON" -c "import pydantic_core" > /dev/null 2>&1; then
         log_err "pydantic-core installation failed."
-        log_err "Try: pkg install rust  then run ./install_termux.sh again"
+        log_err "Try: pkg install rust && rm -rf $VENV_DIR && ./install_termux.sh"
         exit 1
     fi
 fi
@@ -127,12 +179,12 @@ fi
 PYDANTIC_VER=$("$VENV_PYTHON" -c "import pydantic_core; print(pydantic_core.__version__)" 2>/dev/null || echo "unknown")
 log_ok "pydantic-core $PYDANTIC_VER ready"
 
-# ── Step 3c: Install remaining requirements ──────────────────────────────────
+# ── Install remaining requirements ────────────────────────────────────────────
 # Strip Android-incompatible packages:
-#   - playwright  → headless Chromium is not supported on Android ARM
-#   - uvicorn[standard] → uvloop doesn't support Android's bionic libc; use plain uvicorn
-#   - pystray     → requires a display/system tray; not applicable on Android
-log_info "Installing backend dependencies from requirements.txt..."
+#   playwright  → no headless Chromium on Android ARM
+#   uvicorn[standard] → uvloop doesn't work on Android bionic libc
+#   pystray     → needs a system tray/display, N/A on Android
+log_info "Installing backend dependencies..."
 sed \
     -e 's/uvicorn\[standard\]/uvicorn/g' \
     -e '/^playwright/d' \
@@ -173,15 +225,13 @@ fi
 echo -e "\n${GREEN}========================================================${NC}"
 echo -e "${GREEN}     Vault Termux Installation COMPLETED Successfully!  ${NC}"
 echo -e "${GREEN}========================================================${NC}"
-echo -e "You can launch Vault at any time on Android using:      "
-echo -e "  ${CYAN}./start_termux.sh${NC}                                   "
-echo -e "========================================================\n"
+echo -e "You can launch Vault at any time on Android using:"
+echo -e "  ${CYAN}./start_termux.sh${NC}"
+echo -e "========================================================"
 
-# Offer to start Vault immediately
-read -p "Would you like to start Vault right now? [Y/n]: " -r start_now
+read -p $'\nWould you like to start Vault right now? [Y/n]: ' -r start_now
 if [[ "$start_now" =~ ^[Nn]$ ]]; then
     exit 0
 fi
 
-# Launch Vault
 exec "$SCRIPT_DIR/start_termux.sh"
