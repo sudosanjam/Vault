@@ -45,3 +45,47 @@ def test_graph_data_and_traversal(test_container):
     n1_loaded = next(n for n in reloaded_graph.nodes if n.id == n1.metadata.id)
     assert n1_loaded.x == 100.0
     assert n1_loaded.y == 200.0
+
+
+def test_named_layouts_and_relationships(test_container):
+    svc = test_container.note_service
+    graph_svc = test_container.graph_service
+
+    na = svc.create_note(NoteCreateRequest(title="Alpha"))
+    nb = svc.create_note(NoteCreateRequest(title="Beta"))
+    nc = svc.create_note(NoteCreateRequest(title="Gamma"))
+
+    # Named layout test
+    graph_svc.save_layout(
+        GraphLayoutPayload(
+            positions={na.metadata.id: {"x": 50.0, "y": 60.0}},
+            layout_name="cluster_view",
+            set_active=True,
+        )
+    )
+    layouts = graph_svc.get_layouts()
+    assert "cluster_view" in layouts.get("layouts", {})
+    assert layouts.get("active_layout") == "cluster_view"
+
+    # Create and update relationship
+    graph_svc.create_relationship(na.metadata.id, nb.metadata.id, "references", "Initial Ref")
+    na_note = svc.get_note_by_id(na.metadata.id)
+    assert len(na_note.metadata.relations) == 1
+    assert na_note.metadata.relations[0].type == "references"
+    assert na_note.metadata.relations[0].target_id == nb.metadata.id
+
+    # Update relationship to target Gamma with new type and label
+    graph_svc.update_relationship(
+        source_id=na.metadata.id,
+        old_target_id=nb.metadata.id,
+        old_relation_type="references",
+        new_target_id=nc.metadata.id,
+        new_relation_type="depends_on",
+        new_label="Updated Dep",
+    )
+    na_updated = svc.get_note_by_id(na.metadata.id)
+    assert len(na_updated.metadata.relations) == 1
+    assert na_updated.metadata.relations[0].target_id == nc.metadata.id
+    assert na_updated.metadata.relations[0].type == "depends_on"
+    assert na_updated.metadata.relations[0].label == "Updated Dep"
+

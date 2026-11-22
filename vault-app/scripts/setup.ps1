@@ -384,10 +384,29 @@ if (-not (Test-Path $DistIndex)) {
     throw "Frontend build artifact dist\index.html was not generated. Please inspect build output."
 }
 
+# Compile Vault Launcher executable
+$CscPath = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+if (-not (Test-Path $CscPath)) {
+    $CscPath = "C:\Windows\Microsoft.NET\Framework\v4.0.30319\csc.exe"
+}
+$VaultLauncherCs = Join-Path $ProjectRoot "vault-app\launchers\VaultLauncher.cs"
+$VaultExe = Join-Path $ProjectRoot "vault.exe"
+$VaultIco = Join-Path $ProjectRoot "vault.ico"
+
+if ((Test-Path $CscPath) -and (Test-Path $VaultLauncherCs)) {
+    $iconArg = if (Test-Path $VaultIco) { "/win32icon:`"$VaultIco`"" } else { "" }
+    & $CscPath /nologo /target:winexe $iconArg /out:"$VaultExe" "$VaultLauncherCs"
+    if (Test-Path $VaultExe) {
+        Write-Success "Generated launcher executable: vault.exe"
+    }
+}
+
 Write-Host "`n========================================================" -ForegroundColor Green
 Write-Host "       Vault One-Click Setup COMPLETED Successfully!   " -ForegroundColor Green
 Write-Host "========================================================" -ForegroundColor Green
 Write-Host "You can now launch Vault at any time using:            " -ForegroundColor White
+Write-Host "  - Executable Launcher: vault.exe (Classic Game Launcher)" -ForegroundColor Cyan
+Write-Host "  - Update Patcher:      update.exe (GitHub Auto-Patcher)" -ForegroundColor Cyan
 Write-Host "  - Windows Batch:      start.bat                      " -ForegroundColor Cyan
 Write-Host "  - Windows PowerShell: .\start.ps1                    " -ForegroundColor Cyan
 Write-Host "========================================================`n" -ForegroundColor Green

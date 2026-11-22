@@ -83,6 +83,7 @@ export const api = {
     tag?: string;
     note_type?: string;
     include_broken?: boolean;
+    layout?: string;
   }) => {
     const q = new URLSearchParams();
     if (params?.root_id) q.set('root_id', params.root_id);
@@ -90,13 +91,22 @@ export const api = {
     if (params?.tag) q.set('tag', params.tag);
     if (params?.note_type) q.set('note_type', params.note_type);
     if (params?.include_broken) q.set('include_broken', 'true');
+    if (params?.layout) q.set('layout', params.layout);
     return fetchJson<GraphData>(`${API_BASE}/graph?${q.toString()}`);
   },
-  saveGraphLayout: (positions: Record<string, { x: number; y: number }>) =>
-    fetchJson<{ status: string }>(`${API_BASE}/graph/layout`, {
+  getGraphLayouts: () =>
+    fetchJson<{ active_layout: string; layouts: Record<string, { positions: Record<string, { x: number; y: number }> }> }>(
+      `${API_BASE}/graph/layouts`
+    ),
+  saveGraphLayout: (
+    positions: Record<string, { x: number; y: number }>,
+    layout_name: string = 'default',
+    set_active: boolean = true
+  ) =>
+    fetchJson<{ status: string; layout_name: string }>(`${API_BASE}/graph/layout`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ positions }),
+      body: JSON.stringify({ positions, layout_name, set_active }),
     }),
   createRelationship: (
     source_id: string,
@@ -109,12 +119,33 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ source_id, target_id, relation_type, label }),
     }),
+  updateRelationship: (
+    source_id: string,
+    old_target_id: string,
+    old_relation_type: string,
+    new_target_id: string,
+    new_relation_type: string = 'references',
+    new_label?: string
+  ) =>
+    fetchJson<{ status: string }>(`${API_BASE}/graph/relationships`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        source_id,
+        old_target_id,
+        old_relation_type,
+        new_target_id,
+        new_relation_type,
+        new_label,
+      }),
+    }),
   deleteRelationship: (source_id: string, target_id: string, relation_type: string) =>
     fetchJson<{ status: string }>(`${API_BASE}/graph/relationships`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ source_id, target_id, relation_type }),
     }),
+
 
   // Search & Autocomplete
   search: (query: string, tag?: string, note_type?: string) => {
@@ -138,6 +169,9 @@ export const api = {
     return res.json();
   },
   getAttachmentFileUrl: (relPath: string) => `${API_BASE}/attachments/file/${encodeURIComponent(relPath)}`,
+  listAttachments: () => fetchJson<{ name: string; relative_path: string; url: string; size_bytes: number; modified_at: number }[]>(`${API_BASE}/attachments/list`),
+  openAttachmentsFolder: () =>
+    fetchJson<{ status: string; path: string }>(`${API_BASE}/attachments/open-folder`, { method: 'POST' }),
   getOrphanedAttachments: () => fetchJson<any[]>(`${API_BASE}/attachments/orphans`),
   cleanupOrphanedAttachments: () =>
     fetchJson<{ deleted_count: number; deleted_files: string[] }>(`${API_BASE}/attachments/cleanup`, {
@@ -248,4 +282,37 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ vault_path }),
     }),
+  browseFolders: (path?: string) => {
+    const q = path ? `?path=${encodeURIComponent(path)}` : '';
+    return fetchJson<{
+      current_path: string;
+      parent_path: string | null;
+      is_current_vault: boolean;
+      active_vault_path: string;
+      folders: { name: string; path: string; is_vault: boolean }[];
+      drives: string[];
+    }>(`${API_BASE}/system/browse-folders${q}`);
+  },
+  createVault: (parent_path: string, name: string) =>
+    fetchJson<{ status: string; vault_path: string }>(`${API_BASE}/system/create-vault`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ parent_path, name }),
+    }),
+  checkUpdates: () =>
+    fetchJson<{
+      update_available: boolean;
+      current_commit: string;
+      latest_commit: string;
+      latest_sha?: string;
+      commit_message: string;
+      commit_date: string;
+      repo_url: string;
+      auto_check_updates: boolean;
+    }>(`${API_BASE}/system/check-updates`),
+  applyUpdate: () =>
+    fetchJson<{ status: string; message: string; output?: string }>(`${API_BASE}/system/apply-update`, {
+      method: 'POST',
+    }),
 };
+

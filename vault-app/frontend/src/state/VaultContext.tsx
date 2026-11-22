@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
+import { encryptNoteContent, decryptNoteContent, generateSalt, hashPassword } from '../utils/crypto';
 import type {
   ActiveView,
   BacklinkItem,
@@ -58,6 +59,18 @@ export interface VaultContextType {
   setDiagnosticsModalOpen: (open: boolean) => void;
   createNoteModalOpen: boolean;
   setCreateNoteModalOpen: (open: boolean) => void;
+  vaultPickerModalOpen: boolean;
+  setVaultPickerModalOpen: (open: boolean) => void;
+  noteLockModalOpen: boolean;
+  setNoteLockModalOpen: (open: boolean) => void;
+
+  // Security / Note Locking
+  isNoteLocked: (note: Note | null) => boolean;
+  isNoteUnlockedInSession: (noteId: string) => boolean;
+  unlockNoteInSession: (noteId: string, password: string, decryptedContent: string) => void;
+  lockNoteWithPassword: (noteId: string, password: string) => Promise<void>;
+  removeNotePassword: (noteId: string) => Promise<void>;
+  relockNoteInSession: (noteId: string) => Promise<void>;
 
   // Actions
   selectNode: (id: string | null) => Promise<void>;
@@ -121,10 +134,122 @@ export const VaultProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [diagnosticsModalOpen, setDiagnosticsModalOpen] = useState(false);
   const [createNoteModalOpen, setCreateNoteModalOpen] = useState(false);
+  const [vaultPickerModalOpen, setVaultPickerModalOpen] = useState(false);
+  const [noteLockModalOpen, setNoteLockModalOpen] = useState(false);
+
+  // In-session unlocked passwords: noteId -> password
+  const [unlockedPasswords, setUnlockedPasswords] = useState<Record<string, string>>({});
+  const unlockedPasswordsRef = useRef<Record<string, string>>({});
+  unlockedPasswordsRef.current = unlockedPasswords;
 
   // Debounced autosave timer
   const autosaveTimerRef = useRef<any>(null);
   const pendingContentRef = useRef<string | null>(null);
+
+  const isNoteLocked = (note: Note | null): boolean => {
+    return note?.metadata.custom_properties?.is_locked === true;
+  };
+
+  const isNoteUnlockedInSession = (noteId: string): boolean => {
+    return Boolean(unlockedPasswords[noteId]);
+  };
+
+  const unlockNoteInSession = (noteId: string, password: string, decryptedContent: string) => {
+    setUnlockedPasswords(prev => ({ ...prev, [noteId]: password }));
+    if (activeNote && activeNote.metadata.id === noteId) {
+      setActiveNote(prev => (prev ? { ...prev, content: decryptedContent } : null));
+    }
+  };
+
+  const relockNoteInSession = async (noteId: string) => {
+    if (pendingContentRef.current !== null && activeNote?.metadata.id === noteId) {
+      await saveCurrentNote();
+    }
+    setUnlockedPasswords(prev => {
+      const copy = { ...prev };
+      delete copy[noteId];
+      return copy;
+    });
+    if (activeNote?.metadata.id === noteId) {
+      await loadNoteDetails(noteId);
+    }
+  };
+
+  const lockNoteWithPassword = async (noteId: string, password: string) => {
+    if (!activeNote || activeNote.metadata.id !== noteId) return;
+    const currentPlaintext = pendingContentRef.current ?? activeNote.content;
+
+    const salt = generateSalt();
+    const hash = await hashPassword(password, salt);
+    const encrypted = await encryptNoteContent(currentPlaintext, password, salt);
+
+    const updatedProps = {
+      ...(activeNote.metadata.custom_properties || {}),
+      is_locked: true,
+      lock_salt: salt,
+      lock_hash: hash,
+    };
+
+    setSaveStatus('saving');
+    try {
+      const updated = await api.updateNote(noteId, {
+        content: encrypted,
+        custom_properties: updatedProps,
+        expected_hash: activeNote.metadata.content_hash,
+      });
+
+      // Keep plaintext in activeNote so user can continue seamlessly
+      setActiveNote({
+        ...updated,
+        content: currentPlaintext,
+      });
+      pendingContentRef.current = null;
+      setUnlockedPasswords(prev => ({ ...prev, [noteId]: password }));
+      setSaveStatus('saved');
+      setLastSavedTime(new Date());
+      await refreshTreeAndSummaries();
+    } catch (e: any) {
+      setSaveStatus('error');
+      setSaveError(e.message);
+      throw e;
+    }
+  };
+
+  const removeNotePassword = async (noteId: string) => {
+    if (!activeNote || activeNote.metadata.id !== noteId) return;
+    const currentPlaintext = pendingContentRef.current ?? activeNote.content;
+
+    const updatedProps = {
+      ...(activeNote.metadata.custom_properties || {}),
+    };
+    delete updatedProps.is_locked;
+    delete updatedProps.lock_salt;
+    delete updatedProps.lock_hash;
+
+    setSaveStatus('saving');
+    try {
+      const updated = await api.updateNote(noteId, {
+        content: currentPlaintext,
+        custom_properties: updatedProps,
+        expected_hash: activeNote.metadata.content_hash,
+      });
+
+      setActiveNote(updated);
+      pendingContentRef.current = null;
+      setUnlockedPasswords(prev => {
+        const copy = { ...prev };
+        delete copy[noteId];
+        return copy;
+      });
+      setSaveStatus('saved');
+      setLastSavedTime(new Date());
+      await refreshTreeAndSummaries();
+    } catch (e: any) {
+      setSaveStatus('error');
+      setSaveError(e.message);
+      throw e;
+    }
+  };
 
   const refreshTreeAndSummaries = async () => {
     try {
@@ -174,7 +299,21 @@ export const VaultProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         api.getBacklinks(id),
         api.getOutgoingLinks(id),
       ]);
-      setActiveNote(note);
+
+      let content = note.content;
+      const isLocked = note.metadata.custom_properties?.is_locked === true;
+      const sessionPass = unlockedPasswordsRef.current[id];
+      const salt = note.metadata.custom_properties?.lock_salt;
+
+      if (isLocked && sessionPass && salt) {
+        try {
+          content = await decryptNoteContent(note.content, sessionPass, salt);
+        } catch {
+          // Password not matching or failed decrypt
+        }
+      }
+
+      setActiveNote({ ...note, content });
       setBacklinks(bLinks);
       setOutgoingLinks(oLinks);
       setSaveStatus('saved');
@@ -232,7 +371,21 @@ export const VaultProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       autosaveTimerRef.current = null;
     }
 
-    const contentToSave = pendingContentRef.current ?? activeNote.content;
+    const currentPlaintext = pendingContentRef.current ?? activeNote.content;
+    let contentToSave = currentPlaintext;
+
+    const isLocked = activeNote.metadata.custom_properties?.is_locked === true;
+    const sessionPass = unlockedPasswordsRef.current[activeNote.metadata.id];
+    const salt = activeNote.metadata.custom_properties?.lock_salt;
+
+    if (isLocked && sessionPass && salt) {
+      try {
+        contentToSave = await encryptNoteContent(currentPlaintext, sessionPass, salt);
+      } catch (err) {
+        console.error('Failed to encrypt note content during save:', err);
+      }
+    }
+
     setSaveStatus('saving');
 
     try {
@@ -240,7 +393,10 @@ export const VaultProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         content: contentToSave,
         expected_hash: activeNote.metadata.content_hash,
       });
-      setActiveNote(updated);
+      setActiveNote({
+        ...updated,
+        content: currentPlaintext,
+      });
       pendingContentRef.current = null;
       setSaveStatus('saved');
       setSaveError(null);
@@ -388,6 +544,16 @@ export const VaultProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setDiagnosticsModalOpen,
         createNoteModalOpen,
         setCreateNoteModalOpen,
+        vaultPickerModalOpen,
+        setVaultPickerModalOpen,
+        noteLockModalOpen,
+        setNoteLockModalOpen,
+        isNoteLocked,
+        isNoteUnlockedInSession,
+        unlockNoteInSession,
+        lockNoteWithPassword,
+        removeNotePassword,
+        relockNoteInSession,
         selectNode,
         selectNote: selectNode,
         openTab,

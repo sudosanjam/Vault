@@ -1,35 +1,38 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Archive,
   CheckCircle2,
+  ChevronDown,
   Download,
   Eye,
   FileText,
+  Folder,
+  FolderOpen,
   HelpCircle,
-  Moon,
   Network,
   Plus,
   RefreshCw,
   Search,
   Settings,
-  Shield,
   SidebarClose,
   SidebarOpen,
-  Sun,
+  SlidersHorizontal,
   Table,
+  Sparkles,
 } from 'lucide-react';
 import { useTheme } from '../../state/ThemeContext';
 import { useVault } from '../../state/VaultContext';
-import { Badge } from '../ui/Badge';
+import { api } from '../../api/client';
 import { Button } from '../ui/Button';
 
 export const Header: React.FC = () => {
-  const { theme, toggleTheme } = useTheme();
+  const { theme, setTheme, currentThemeDef, availableThemes } = useTheme();
   const {
     activeView,
     setActiveView,
     saveStatus,
     saveError,
+    vaultInfo,
     isLeftPaneOpen,
     isRightPaneOpen,
     toggleLeftPane,
@@ -40,127 +43,263 @@ export const Header: React.FC = () => {
     setSettingsModalOpen,
     setDiagnosticsModalOpen,
     setCreateNoteModalOpen,
+    setVaultPickerModalOpen,
   } = useVault();
 
+  const [toolsMenuOpen, setToolsMenuOpen] = useState(false);
+  const [themeMenuOpen, setThemeMenuOpen] = useState(false);
+  const [updateAvailable, setUpdateAvailable] = useState<boolean>(false);
+  const [latestCommit, setLatestCommit] = useState<string>('');
+
+  const toolsMenuRef = useRef<HTMLDivElement>(null);
+  const themeMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close menus when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (toolsMenuRef.current && !toolsMenuRef.current.contains(e.target as Node)) {
+        setToolsMenuOpen(false);
+      }
+      if (themeMenuRef.current && !themeMenuRef.current.contains(e.target as Node)) {
+        setThemeMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Check for GitHub updates on load if enabled
+  useEffect(() => {
+    let isMounted = true;
+    api.checkUpdates().then(info => {
+      if (isMounted && info.auto_check_updates && info.update_available) {
+        setUpdateAvailable(true);
+        setLatestCommit(info.latest_commit);
+      }
+    }).catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const vaultFolderName = vaultInfo?.vault_path
+    ? vaultInfo.vault_path.split(/[\\/]/).filter(Boolean).pop() || 'Vault'
+    : 'Vault';
+
   return (
-    <header className="h-14 bg-white dark:bg-vault-900 border-b border-vault-200 dark:border-vault-800 flex items-center justify-between px-4 select-none shrink-0 z-20">
-      {/* Left section: Logo & Pane toggle */}
+    <header className="h-14 bg-white/80 dark:bg-vault-900/80 backdrop-blur-xl border-b border-vault-200 dark:border-vault-800 flex items-center justify-between px-4 select-none shrink-0 z-30 transition-colors">
+      {/* Left: Window / Sidebar Toggle + Brand + Vault Peek */}
       <div className="flex items-center gap-3">
         <button
           onClick={toggleLeftPane}
-          title={isLeftPaneOpen ? 'Collapse Explorer' : 'Expand Explorer'}
-          className="text-vault-500 hover:text-vault-800 dark:text-vault-400 dark:hover:text-vault-100 p-1.5 rounded-lg hover:bg-vault-100 dark:hover:bg-vault-800 transition-colors"
+          title={isLeftPaneOpen ? 'Collapse Explorer (Ctrl+\\)' : 'Expand Explorer (Ctrl+\\)'}
+          className="text-vault-500 hover:text-vault-900 dark:text-vault-400 dark:hover:text-vault-100 p-1.5 rounded-lg hover:bg-vault-100 dark:hover:bg-vault-800/70 transition-colors"
         >
-          {isLeftPaneOpen ? <SidebarClose size={18} /> : <SidebarOpen size={18} />}
+          {isLeftPaneOpen ? <SidebarClose size={17} /> : <SidebarOpen size={17} />}
         </button>
 
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-600 to-indigo-500 flex items-center justify-center text-white shadow-sm shadow-indigo-500/20">
-            <Shield size={18} className="stroke-[2.5]" />
-          </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="font-bold text-base tracking-tight text-vault-900 dark:text-vault-50">
+        <div className="flex items-center gap-2.5">
+          <div
+            className="flex items-center gap-2 cursor-pointer group"
+            onClick={() => setSettingsModalOpen(true)}
+            title="Vault Preferences"
+          >
+            <div className="w-7 h-7 rounded-lg bg-[var(--accent-muted)] border border-[var(--accent-primary)]/30 flex items-center justify-center text-[var(--accent-primary)] shadow-xs transition-transform group-hover:scale-105">
+              <Sparkles size={14} />
+            </div>
+            <span className="font-extrabold text-sm tracking-tight text-vault-900 dark:text-vault-50">
               Vault
             </span>
-            <span className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/80 px-1.5 py-0.2 rounded uppercase tracking-wider">
-              Local
-            </span>
           </div>
+
+          {/* Clean Apple-style Vault Folder Button */}
+          <button
+            onClick={() => setVaultPickerModalOpen(true)}
+            className="group flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-vault-100/80 hover:bg-vault-200 dark:bg-vault-800/80 dark:hover:bg-vault-700/80 border border-vault-200 dark:border-vault-700/60 text-vault-700 dark:text-vault-300 transition-all text-xs"
+            title={`Active Vault:\n${vaultInfo?.vault_path || 'Loading...'}\n\nClick to switch or create vaults.`}
+          >
+            <Folder className="w-3 h-3 text-amber-500 shrink-0" />
+            <span className="font-medium text-[11px] max-w-[120px] truncate text-vault-800 dark:text-vault-200">
+              {vaultFolderName}
+            </span>
+            <ChevronDown className="w-3 h-3 text-vault-400 group-hover:text-vault-200 shrink-0" />
+          </button>
         </div>
 
-        {/* Global Search Bar Trigger */}
+        {/* Search Bar Pill */}
         <button
           onClick={() => setSearchModalOpen(true)}
-          className="ml-3 flex items-center gap-2 px-3 py-1.5 text-xs text-vault-400 dark:text-vault-400 bg-vault-100 dark:bg-vault-800 hover:bg-vault-200 dark:hover:bg-vault-700/80 border border-vault-200 dark:border-vault-700 rounded-lg transition-all w-52 justify-between"
+          className="hidden sm:flex items-center gap-2 px-3 py-1.5 text-xs text-vault-400 dark:text-vault-400 bg-vault-100/70 dark:bg-vault-800/50 hover:bg-vault-200 dark:hover:bg-vault-700/70 border border-vault-200 dark:border-vault-700/60 rounded-full transition-all w-44 justify-between"
         >
           <span className="flex items-center gap-1.5">
-            <Search size={14} />
-            <span>Search Vault...</span>
+            <Search size={13} />
+            <span className="text-[11px]">Search notes...</span>
           </span>
-          <kbd className="font-mono text-[10px] bg-white dark:bg-vault-900 px-1.5 py-0.5 rounded border border-vault-200 dark:border-vault-700 text-vault-500">
+          <kbd className="font-mono text-[9px] bg-white dark:bg-vault-900 px-1.5 py-0.5 rounded border border-vault-200 dark:border-vault-700 text-vault-500">
             Ctrl+K
           </kbd>
         </button>
       </div>
 
-      {/* Center section: View Switcher */}
-      <div className="flex items-center p-0.5 bg-vault-100 dark:bg-vault-800/80 border border-vault-200 dark:border-vault-700 rounded-lg">
+      {/* Center: Apple macOS Segmented Pill Control */}
+      <div className="flex items-center p-1 bg-vault-100/80 dark:bg-vault-800/60 border border-vault-200 dark:border-vault-700/60 rounded-xl shadow-xs">
         <button
           onClick={() => setActiveView('editor')}
-          className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-all ${
+          className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg transition-all duration-150 ${
             activeView === 'editor'
-              ? 'bg-white dark:bg-vault-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
-              : 'text-vault-600 dark:text-vault-400 hover:text-vault-900 dark:hover:text-vault-200'
+              ? 'bg-white dark:bg-vault-900 text-[var(--accent-primary)] shadow-sm'
+              : 'text-vault-500 dark:text-vault-400 hover:text-vault-900 dark:hover:text-vault-200'
           }`}
         >
-          <FileText size={14} />
+          <FileText size={13} />
           <span>Editor</span>
         </button>
         <button
           onClick={() => setActiveView('preview')}
-          className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-all ${
+          className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg transition-all duration-150 ${
             activeView === 'preview'
-              ? 'bg-white dark:bg-vault-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
-              : 'text-vault-600 dark:text-vault-400 hover:text-vault-900 dark:hover:text-vault-200'
+              ? 'bg-white dark:bg-vault-900 text-[var(--accent-primary)] shadow-sm'
+              : 'text-vault-500 dark:text-vault-400 hover:text-vault-900 dark:hover:text-vault-200'
           }`}
         >
-          <Eye size={14} />
+          <Eye size={13} />
           <span>Preview</span>
         </button>
         <button
           onClick={() => setActiveView('graph')}
-          className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-all ${
+          className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg transition-all duration-150 ${
             activeView === 'graph'
-              ? 'bg-white dark:bg-vault-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
-              : 'text-vault-600 dark:text-vault-400 hover:text-vault-900 dark:hover:text-vault-200'
+              ? 'bg-white dark:bg-vault-900 text-[var(--accent-primary)] shadow-sm'
+              : 'text-vault-500 dark:text-vault-400 hover:text-vault-900 dark:hover:text-vault-200'
           }`}
         >
-          <Network size={14} />
+          <Network size={13} />
           <span>Graph</span>
         </button>
         <button
           onClick={() => setActiveView('table')}
-          className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-all ${
+          className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg transition-all duration-150 ${
             activeView === 'table'
-              ? 'bg-white dark:bg-vault-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
-              : 'text-vault-600 dark:text-vault-400 hover:text-vault-900 dark:hover:text-vault-200'
+              ? 'bg-white dark:bg-vault-900 text-[var(--accent-primary)] shadow-sm'
+              : 'text-vault-500 dark:text-vault-400 hover:text-vault-900 dark:hover:text-vault-200'
           }`}
         >
-          <Table size={14} />
+          <Table size={13} />
           <span>Table</span>
         </button>
       </div>
 
-      {/* Right section: Save Status, Actions, Tools, Settings, Theme */}
+      {/* Right: GitHub Update Pill + Theme Swatch Pill + Save Status + Actions */}
       <div className="flex items-center gap-2">
-        {/* Save Status Indicator */}
-        <div className="mr-2">
+        {/* GitHub Update Notification Pill */}
+        {updateAvailable && (
+          <button
+            onClick={() => setSettingsModalOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-sky-500/15 border border-sky-500/30 text-sky-400 text-xs font-semibold hover:bg-sky-500/25 transition-all shadow-xs"
+            title={`New GitHub version ready (${latestCommit}). Click to view or update.`}
+          >
+            <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
+            <span>Update Available</span>
+          </button>
+        )}
+
+        {/* Save Status Badge */}
+        <div className="hidden md:flex items-center">
           {saveStatus === 'saved' && (
-            <Badge variant="success" size="sm">
+            <span className="text-[11px] text-emerald-400/90 flex items-center gap-1">
               <CheckCircle2 size={12} />
               <span>Saved</span>
-            </Badge>
+            </span>
           )}
           {saveStatus === 'saving' && (
-            <Badge variant="primary" size="sm">
-              <RefreshCw size={12} className="animate-spin" />
+            <span className="text-[11px] text-[var(--accent-primary)] flex items-center gap-1 animate-pulse">
+              <RefreshCw size={11} className="animate-spin" />
               <span>Saving...</span>
-            </Badge>
+            </span>
           )}
           {saveStatus === 'unsaved' && (
-            <Badge variant="warning" size="sm">
-              <span>Unsaved</span>
-            </Badge>
-          )}
-          {saveStatus === 'conflict' && (
-            <Badge variant="danger" size="sm" title={saveError || 'Conflict detected'}>
-              <span>Conflict</span>
-            </Badge>
+            <span className="text-[11px] text-amber-400">Unsaved</span>
           )}
           {saveStatus === 'error' && (
-            <Badge variant="danger" size="sm" title={saveError || 'Save failed'}>
-              <span>Error</span>
-            </Badge>
+            <span className="text-[11px] text-red-400" title={saveError || 'Save failed'}>
+              Error
+            </span>
+          )}
+        </div>
+
+        {/* Quick Theme Switcher Pill */}
+        <div className="relative" ref={themeMenuRef}>
+          <button
+            type="button"
+            onClick={() => setThemeMenuOpen(!themeMenuOpen)}
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-full bg-vault-100/80 hover:bg-vault-200 dark:bg-vault-800/80 dark:hover:bg-vault-700/80 border border-vault-200 dark:border-vault-700/60 text-xs text-vault-800 dark:text-vault-200 font-medium transition-all"
+            title={`Current Theme: ${currentThemeDef.name} (${currentThemeDef.atmosphere})`}
+          >
+            <div className="flex items-center -space-x-1">
+              <span
+                className="w-2.5 h-2.5 rounded-full border border-black/50"
+                style={{ backgroundColor: currentThemeDef.baseCanvas }}
+              />
+              <span
+                className="w-2.5 h-2.5 rounded-full border border-black/50"
+                style={{ backgroundColor: currentThemeDef.accentPrimary }}
+              />
+              <span
+                className="w-2.5 h-2.5 rounded-full border border-black/50"
+                style={{ backgroundColor: currentThemeDef.accentSecondary }}
+              />
+            </div>
+            <span className="hidden sm:inline text-[11px] font-semibold">{currentThemeDef.name}</span>
+            <ChevronDown size={11} className="text-vault-400" />
+          </button>
+
+          {/* Theme Dropdown Popover */}
+          {themeMenuOpen && (
+            <div className="absolute right-0 mt-2 w-64 bg-vault-900/95 backdrop-blur-2xl border border-vault-700/80 rounded-2xl shadow-2xl p-2 z-50 animate-scale-in text-xs space-y-1">
+              <div className="px-2.5 py-1 text-[10px] font-bold text-vault-400 uppercase tracking-wider">
+                Select Theme Palette
+              </div>
+              {availableThemes.map((t) => {
+                const isSelected = theme === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => {
+                      setTheme(t.id);
+                      setThemeMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all text-left ${
+                      isSelected
+                        ? 'bg-[var(--accent-muted)] text-[var(--accent-primary)] font-bold'
+                        : 'text-vault-300 hover:text-white hover:bg-vault-800/80'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="flex items-center -space-x-1 shrink-0">
+                        <span
+                          className="w-3 h-3 rounded-full border border-black/50"
+                          style={{ backgroundColor: t.baseCanvas }}
+                        />
+                        <span
+                          className="w-3 h-3 rounded-full border border-black/50"
+                          style={{ backgroundColor: t.accentPrimary }}
+                        />
+                        <span
+                          className="w-3 h-3 rounded-full border border-black/50"
+                          style={{ backgroundColor: t.accentSecondary }}
+                        />
+                      </div>
+                      <div className="truncate">
+                        <div className="text-xs font-semibold">{t.name}</div>
+                        <div className="text-[10px] text-vault-400 truncate">{t.atmosphere}</div>
+                      </div>
+                    </div>
+                    {isSelected && <span className="text-xs font-bold text-[var(--accent-primary)] shrink-0">✓</span>}
+                  </button>
+                );
+              })}
+            </div>
           )}
         </div>
 
@@ -168,66 +307,100 @@ export const Header: React.FC = () => {
         <Button
           variant="primary"
           size="sm"
-          icon={<Plus size={14} />}
+          icon={<Plus size={13} />}
           onClick={() => setCreateNoteModalOpen(true)}
+          className="rounded-full shadow-xs"
         >
           New Note
         </Button>
 
-        {/* Export Modal Trigger */}
-        <Button
-          variant="secondary"
-          size="sm"
-          icon={<Download size={14} />}
-          onClick={() => setExportModalOpen(true)}
-        >
-          Export
-        </Button>
+        {/* Tools Sub-Menu */}
+        <div className="relative" ref={toolsMenuRef}>
+          <button
+            onClick={() => setToolsMenuOpen(!toolsMenuOpen)}
+            className="p-2 rounded-full text-vault-500 hover:text-vault-900 dark:text-vault-400 dark:hover:text-vault-100 hover:bg-vault-100 dark:hover:bg-vault-800/70 transition-colors"
+            title="Tools & System"
+          >
+            <SlidersHorizontal size={15} />
+          </button>
 
-        {/* Backups Modal Trigger */}
-        <Button
-          variant="secondary"
-          size="sm"
-          icon={<Archive size={14} />}
-          onClick={() => setBackupModalOpen(true)}
-        >
-          Backups
-        </Button>
+          {toolsMenuOpen && (
+            <div className="absolute right-0 mt-2 w-56 bg-white/95 dark:bg-vault-900/95 backdrop-blur-2xl border border-vault-200 dark:border-vault-800 rounded-2xl shadow-2xl p-1.5 z-50 text-xs">
+              <button
+                onClick={() => {
+                  setToolsMenuOpen(false);
+                  setExportModalOpen(true);
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-vault-100 dark:hover:bg-vault-800 text-vault-700 dark:text-vault-200 transition-colors text-left"
+              >
+                <Download size={14} className="text-indigo-400" />
+                <div>
+                  <div className="font-semibold">Export Notes</div>
+                  <div className="text-[10px] text-vault-400">PDF, Markdown, HTML, JSON</div>
+                </div>
+              </button>
+              <button
+                onClick={() => {
+                  setToolsMenuOpen(false);
+                  setBackupModalOpen(true);
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-vault-100 dark:hover:bg-vault-800 text-vault-700 dark:text-vault-200 transition-colors text-left"
+              >
+                <Archive size={14} className="text-amber-400" />
+                <div>
+                  <div className="font-semibold">Vault Backups</div>
+                  <div className="text-[10px] text-vault-400">Snapshots & ZIP restore</div>
+                </div>
+              </button>
+              <button
+                onClick={() => {
+                  setToolsMenuOpen(false);
+                  setVaultPickerModalOpen(true);
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-vault-100 dark:hover:bg-vault-800 text-vault-700 dark:text-vault-200 transition-colors text-left"
+              >
+                <FolderOpen size={14} className="text-sky-400" />
+                <div>
+                  <div className="font-semibold">Switch Vault</div>
+                  <div className="text-[10px] text-vault-400">Explore & manage locations</div>
+                </div>
+              </button>
+              <div className="border-t border-vault-200 dark:border-vault-800 my-1" />
+              <button
+                onClick={() => {
+                  setToolsMenuOpen(false);
+                  setDiagnosticsModalOpen(true);
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-vault-100 dark:hover:bg-vault-800 text-vault-700 dark:text-vault-200 transition-colors text-left"
+              >
+                <HelpCircle size={14} className="text-purple-400" />
+                <span>Health & Diagnostics</span>
+              </button>
+              <button
+                onClick={() => {
+                  setToolsMenuOpen(false);
+                  setSettingsModalOpen(true);
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-vault-100 dark:hover:bg-vault-800 text-vault-700 dark:text-vault-200 transition-colors text-left"
+              >
+                <Settings size={14} className="text-vault-400" />
+                <span>System Preferences</span>
+              </button>
+            </div>
+          )}
+        </div>
 
-        {/* Health Diagnostics Trigger */}
-        <button
-          onClick={() => setDiagnosticsModalOpen(true)}
-          title="System Health & Diagnostics"
-          className="text-vault-500 hover:text-vault-800 dark:text-vault-400 dark:hover:text-vault-100 p-1.5 rounded-lg hover:bg-vault-100 dark:hover:bg-vault-800 transition-colors"
-        >
-          <HelpCircle size={18} />
-        </button>
-
-        {/* Settings */}
-        <button
-          onClick={() => setSettingsModalOpen(true)}
-          title="Vault Settings"
-          className="text-vault-500 hover:text-vault-800 dark:text-vault-400 dark:hover:text-vault-100 p-1.5 rounded-lg hover:bg-vault-100 dark:hover:bg-vault-800 transition-colors"
-        >
-          <Settings size={18} />
-        </button>
-
-        {/* Theme Toggle */}
-        <button
-          onClick={toggleTheme}
-          title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
-          className="text-vault-500 hover:text-vault-800 dark:text-vault-400 dark:hover:text-vault-100 p-1.5 rounded-lg hover:bg-vault-100 dark:hover:bg-vault-800 transition-colors"
-        >
-          {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-        </button>
-
-        {/* Right Pane Toggle */}
+        {/* Right Inspector Toggle */}
         <button
           onClick={toggleRightPane}
-          title={isRightPaneOpen ? 'Collapse Inspector' : 'Expand Inspector'}
-          className="text-vault-500 hover:text-vault-800 dark:text-vault-400 dark:hover:text-vault-100 p-1.5 rounded-lg hover:bg-vault-100 dark:hover:bg-vault-800 transition-colors ml-1"
+          title={isRightPaneOpen ? 'Collapse Inspector (Ctrl+]' : 'Expand Inspector (Ctrl+]'}
+          className="p-1.5 rounded-lg text-vault-500 hover:text-vault-900 dark:text-vault-400 dark:hover:text-vault-100 hover:bg-vault-100 dark:hover:bg-vault-800/70 transition-colors"
         >
-          {isRightPaneOpen ? <SidebarClose size={18} className="rotate-180" /> : <SidebarOpen size={18} className="rotate-180" />}
+          {isRightPaneOpen ? (
+            <SidebarClose size={17} className="rotate-180" />
+          ) : (
+            <SidebarOpen size={17} className="rotate-180" />
+          )}
         </button>
       </div>
     </header>

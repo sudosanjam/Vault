@@ -8,15 +8,32 @@ Vault is a production-quality, local-first personal knowledge management applica
 
 ---
 
-## Quick Start (One-Click)
+## Quick Start (Classic Game Executables & Scripts)
 
-### Windows
-- **Launch Vault:** Double-click [`start.bat`](start.bat) (or run `.\start.ps1` in PowerShell).
-  - Automatically verifies all prerequisites (Python 3.10+, Node.js 18+, npm).
-  - If any requirement is missing on a fresh Windows install, **it is automatically installed**.
-  - Configures the Python virtualenv, installs backend packages, installs Playwright Chromium, builds the frontend SPA, launches the server, and automatically opens `http://127.0.0.1:8000`.
-- **Stop Server:** Double-click [`stop.bat`](stop.bat) (or run `.\stop.ps1`).
-- **Setup Only (Without Starting):** Double-click [`setup.bat`](setup.bat) (or run `.\setup.ps1`).
+### Windows Executable Suite (Classic Game Style)
+- **First-Time Setup:** Run [`setup.exe`](setup.exe)
+  - Vintage PC installer console that validates Python 3 and Node.js, installs dependencies, builds the frontend, links attachments, and **generates `vault.exe`**.
+- **Launch Vault:** Double-click [`vault.exe`](vault.exe) (generated upon running `setup.exe`).
+- **Update Application:** Run [`update.exe`](update.exe)
+  - Checks GitHub (`sudosanjam/Vault`) for incoming patches, compares commits, pulls updates, rebuilds the application, and relaunches `vault.exe`.
+- **Scripts Alternative:** [`start.bat`](start.bat) / [`start.ps1`](start.ps1) and [`stop.bat`](stop.bat) / [`stop.ps1`](stop.ps1).
+
+---
+
+## Color Themes & Atmospheric Palettes
+
+| Palette | Base Canvas | Accent Primary | Accent Secondary | Atmosphere |
+| --- | --- | --- | --- | --- |
+| **Obsidian** | `#0e0f15` (Slate Obsidian) | `#89b4fa` (Celestial Blue) | `#cba6f7` (Mocha Lavender) | Clean Apple Pro modern dark |
+| **Coffee** | `#120e0c` (Espresso Dark) | `#d4a373` (Caramel Mocha) | `#e0a96d` (Warm Hazelnut) | Warm roasted dark brown |
+| **Ruby** | `#13080b` (Midnight Bordeaux) | `#f38ba8` (Velvet Crimson) | `#f2cdcd` (Pastel Rose) | Rich burgundy velvet |
+| **Sapphire** | `#080d16` (Ocean Abyss) | `#38bdf8` (Electric Cyan) | `#818cf8` (Royal Azure) | Deep midnight oceanic navy |
+| **Emerald** | `#07120d` (Pine Forest) | `#5eead4` (Pastel Mint) | `#a6e3a1` (Sage Green) | Botanical alpine pine |
+| **Amethyst** | `#0e0817` (Deep Cosmic) | `#c084fc` (Radiant Violet) | `#f5c2e7` (Lilac Stardust) | Cosmic cyber lavender |
+
+Switch palettes seamlessly in the **Header Theme Pill** or inside **System Preferences**.
+
+---
 
 ### Linux
 - **Launch Vault (All-In-One Script):** Run [`./start.sh`](start.sh)

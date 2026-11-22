@@ -5,14 +5,15 @@ import { useVault } from '../../state/VaultContext';
 import { Dialog } from '../ui/Dialog';
 import { Button } from '../ui/Button';
 import {
-  Moon,
-  Sun,
   Palette,
   FolderOpen,
   CheckCircle2,
   AlertTriangle,
-  Cpu,
   Monitor,
+  RefreshCw,
+  GitBranch,
+  DownloadCloud,
+  Check,
 } from 'lucide-react';
 
 interface SettingsModalProps {
@@ -21,7 +22,7 @@ interface SettingsModalProps {
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, availableThemes } = useTheme();
   const {
     settingsModalOpen,
     setSettingsModalOpen,
@@ -37,13 +38,80 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  // Update checking state
+  const [autoCheckUpdates, setAutoCheckUpdates] = useState<boolean>(true);
+  const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<{
+    update_available: boolean;
+    current_commit: string;
+    latest_commit: string;
+    commit_message: string;
+    commit_date: string;
+    repo_url: string;
+  } | null>(null);
+  const [updateStatusMsg, setUpdateStatusMsg] = useState<string | null>(null);
+
   useEffect(() => {
     if (isModalOpen && vaultInfo) {
       setVaultPathInput(vaultInfo.vault_path);
       setError(null);
       setSuccessMsg(null);
+      // Fetch current config for update setting
+      api.getConfig().then(res => {
+        if (res.config && typeof res.config.auto_check_updates === 'boolean') {
+          setAutoCheckUpdates(res.config.auto_check_updates);
+        }
+      }).catch(() => {});
     }
   }, [isModalOpen, vaultInfo]);
+
+  const handleToggleAutoUpdate = async (enabled: boolean) => {
+    setAutoCheckUpdates(enabled);
+    try {
+      const current = await api.getConfig();
+      const updatedConfig = { ...(current.config || {}), auto_check_updates: enabled };
+      await api.updateConfig(updatedConfig);
+      setSuccessMsg(`Automatic update check ${enabled ? 'enabled' : 'disabled'}.`);
+    } catch (e: any) {
+      console.error(e);
+    }
+  };
+
+  const handleCheckUpdatesNow = async () => {
+    try {
+      setIsCheckingUpdates(true);
+      setError(null);
+      setUpdateStatusMsg(null);
+      const res = await api.checkUpdates();
+      setUpdateInfo(res);
+      if (!res.update_available) {
+        setUpdateStatusMsg('Vault is currently up to date! You are running the latest version.');
+      }
+    } catch (err: any) {
+      setError('Failed to check for updates: ' + (err.message || 'Network error'));
+    } finally {
+      setIsCheckingUpdates(false);
+    }
+  };
+
+  const handleApplyUpdate = async () => {
+    try {
+      setIsUpdating(true);
+      setError(null);
+      const res = await api.applyUpdate();
+      if (res.status === 'success') {
+        setUpdateStatusMsg(res.message);
+        setUpdateInfo(prev => prev ? { ...prev, update_available: false } : null);
+      } else {
+        setError(res.message);
+      }
+    } catch (err: any) {
+      setError('Update failed: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   const handleSwitchVault = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,53 +131,166 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
   };
 
   return (
-    <Dialog isOpen={isModalOpen} onClose={handleClose} title="Preferences & System Settings" maxWidth="lg">
+    <Dialog isOpen={isModalOpen} onClose={handleClose} title="Preferences & Settings" maxWidth="lg">
       <div className="space-y-6">
         {error && (
-          <div className="p-3 text-xs bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg flex items-center gap-2">
+          <div className="p-3 text-xs bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 flex-shrink-0" />
             <span>{error}</span>
           </div>
         )}
         {successMsg && (
-          <div className="p-3 text-xs bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-lg flex items-center gap-2">
+          <div className="p-3 text-xs bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
             <span>{successMsg}</span>
           </div>
         )}
 
-        {/* Theme Section */}
+        {/* 1. Theme Selection Palette */}
         <div className="space-y-3">
           <label className="text-xs font-semibold text-vault-400 uppercase tracking-wider flex items-center gap-1.5">
-            <Palette className="w-3.5 h-3.5 text-indigo-500" /> Appearance & Theme
+            <Palette className="w-3.5 h-3.5 text-[var(--accent-primary)]" /> Appearance & Color Palette
           </label>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {[
-              { id: 'dark', label: 'Dark Obsidian', icon: <Moon className="w-4 h-4 text-indigo-400" /> },
-              { id: 'light', label: 'Clean Light', icon: <Sun className="w-4 h-4 text-amber-400" /> },
-              { id: 'cyberpunk', label: 'Neon Cyber', icon: <Cpu className="w-4 h-4 text-cyan-400" /> },
-            ].map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setTheme(t.id as any)}
-                className={`p-3 rounded-xl border flex items-center gap-2.5 transition-all text-left ${
-                  theme === t.id
-                    ? 'border-indigo-500 bg-indigo-500/10 text-vault-900 dark:text-vault-50 shadow-sm ring-1 ring-indigo-500'
-                    : 'border-vault-200 dark:border-vault-800 bg-vault-50 dark:bg-vault-800/50 text-vault-600 dark:text-vault-400 hover:border-vault-300'
-                }`}
-              >
-                {t.icon}
-                <span className="text-xs font-medium">{t.label}</span>
-              </button>
-            ))}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {availableThemes.map((t) => {
+              const isCurrent = theme === t.id;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setTheme(t.id)}
+                  className={`p-3.5 rounded-2xl border text-left transition-all duration-200 relative group flex flex-col justify-between ${
+                    isCurrent
+                      ? 'border-[var(--accent-primary)] ring-1 ring-[var(--accent-primary)] bg-vault-800/80 shadow-md'
+                      : 'border-vault-200 dark:border-vault-800 bg-vault-50/50 dark:bg-vault-850/50 hover:border-vault-400 dark:hover:border-vault-700'
+                  }`}
+                  style={{
+                    backgroundColor: isCurrent ? `${t.baseCanvas}` : undefined,
+                  }}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        {/* 3-Color Swatch Circles */}
+                        <div className="flex items-center -space-x-1">
+                          <span
+                            className="w-3.5 h-3.5 rounded-full border border-black/40 shadow-xs"
+                            style={{ backgroundColor: t.baseCanvas }}
+                            title={`Base Canvas: ${t.canvasName} (${t.baseCanvas})`}
+                          />
+                          <span
+                            className="w-3.5 h-3.5 rounded-full border border-black/40 shadow-xs"
+                            style={{ backgroundColor: t.accentPrimary }}
+                            title={`Accent Primary: ${t.accentPrimaryName} (${t.accentPrimary})`}
+                          />
+                          <span
+                            className="w-3.5 h-3.5 rounded-full border border-black/40 shadow-xs"
+                            style={{ backgroundColor: t.accentSecondary }}
+                            title={`Accent Secondary: ${t.accentSecondaryName} (${t.accentSecondary})`}
+                          />
+                        </div>
+                        <span className="text-xs font-bold text-vault-900 dark:text-vault-100">
+                          {t.name}
+                        </span>
+                      </div>
+                      {isCurrent && (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[var(--accent-muted)] text-[var(--accent-primary)]">
+                          Active
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-vault-400 dark:text-vault-400 leading-snug">
+                      {t.atmosphere}
+                    </p>
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-white/5 text-[10px] text-vault-500 font-mono">
+                    {t.tagline}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* Vault Directory Switcher */}
-        <div className="space-y-3 pt-2 border-t border-vault-200 dark:border-vault-800">
+        {/* 2. GitHub Software Updates Section */}
+        <div className="space-y-3 pt-4 border-t border-vault-200 dark:border-vault-800">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-semibold text-vault-400 uppercase tracking-wider flex items-center gap-1.5">
+              <GitBranch className="w-3.5 h-3.5 text-sky-400" /> Software Updates & GitHub
+            </label>
+            <div className="flex items-center gap-2">
+              <label htmlFor="auto-updates" className="text-xs text-vault-600 dark:text-vault-400 cursor-pointer">
+                Automatic update checking
+              </label>
+              <input
+                id="auto-updates"
+                type="checkbox"
+                checked={autoCheckUpdates}
+                onChange={(e) => handleToggleAutoUpdate(e.target.checked)}
+                className="w-4 h-4 rounded accent-[var(--accent-primary)] cursor-pointer"
+              />
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-vault-50 dark:bg-vault-850/70 border border-vault-200 dark:border-vault-800 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-semibold text-vault-900 dark:text-vault-100 flex items-center gap-2">
+                  <span>Vault Release Channel</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 font-mono">
+                    github.com/sudosanjam/Vault
+                  </span>
+                </div>
+                <p className="text-[11px] text-vault-400 mt-0.5">
+                  Check GitHub for new commits, features, and performance patches.
+                </p>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<RefreshCw size={13} className={isCheckingUpdates ? 'animate-spin' : ''} />}
+                onClick={handleCheckUpdatesNow}
+                disabled={isCheckingUpdates || isUpdating}
+              >
+                {isCheckingUpdates ? 'Checking...' : 'Check Now'}
+              </Button>
+            </div>
+
+            {/* Update details alert */}
+            {updateInfo?.update_available && (
+              <div className="p-3 rounded-xl bg-sky-500/10 border border-sky-500/25 text-xs text-sky-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <div className="font-semibold text-sky-400 flex items-center gap-1.5">
+                    <DownloadCloud size={14} /> New Version Available!
+                  </div>
+                  <div className="text-[11px] text-sky-200/80">
+                    Latest commit: <span className="font-mono font-bold">{updateInfo.latest_commit}</span> — {updateInfo.commit_message}
+                  </div>
+                </div>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  isLoading={isUpdating}
+                  onClick={handleApplyUpdate}
+                >
+                  Update Vault
+                </Button>
+              </div>
+            )}
+
+            {updateStatusMsg && (
+              <div className="text-xs text-emerald-400 flex items-center gap-1.5">
+                <Check size={14} />
+                <span>{updateStatusMsg}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 3. Active Vault Path Switcher */}
+        <div className="space-y-3 pt-4 border-t border-vault-200 dark:border-vault-800">
           <label className="text-xs font-semibold text-vault-400 uppercase tracking-wider flex items-center gap-1.5">
-            <FolderOpen className="w-3.5 h-3.5 text-emerald-400" /> Active Vault Path
+            <FolderOpen className="w-3.5 h-3.5 text-emerald-400" /> Active Vault Directory
           </label>
           <form onSubmit={handleSwitchVault} className="space-y-2">
             <div className="flex gap-2">
@@ -118,24 +299,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                 value={vaultPathInput}
                 onChange={(e) => setVaultPathInput(e.target.value)}
                 placeholder="Absolute path to vault directory"
-                className="flex-1 bg-vault-50 dark:bg-vault-800/60 border border-vault-200 dark:border-vault-700 rounded-lg px-3 py-2 text-xs font-mono text-vault-900 dark:text-vault-100 placeholder:text-vault-400 focus:outline-none focus:border-indigo-500"
+                className="flex-1 bg-vault-50 dark:bg-vault-850/80 border border-vault-200 dark:border-vault-700/80 rounded-xl px-3 py-2 text-xs font-mono text-vault-900 dark:text-vault-100 placeholder:text-vault-400 focus:outline-none focus:border-[var(--accent-primary)]"
               />
               <Button variant="primary" type="submit" isLoading={isSwitching} size="sm">
                 Switch
               </Button>
             </div>
             <p className="text-[11px] text-vault-400">
-              Point Vault to any folder containing or intended for markdown notes. SQLite cache is stored in <code className="text-indigo-500">.vault-cache/</code>.
+              Point Vault to any folder containing markdown notes. Attachments and images are automatically linked for direct exploration.
             </p>
           </form>
         </div>
 
-        {/* System & Architecture Info */}
-        <div className="space-y-3 pt-2 border-t border-vault-200 dark:border-vault-800">
+        {/* 4. Architecture and System Mode */}
+        <div className="space-y-3 pt-4 border-t border-vault-200 dark:border-vault-800">
           <label className="text-xs font-semibold text-vault-400 uppercase tracking-wider flex items-center gap-1.5">
             <Monitor className="w-3.5 h-3.5 text-purple-400" /> Architecture & Capabilities
           </label>
-          <div className="grid grid-cols-2 gap-2 text-xs bg-vault-50 dark:bg-vault-800/50 p-3 rounded-xl border border-vault-200 dark:border-vault-700">
+          <div className="grid grid-cols-2 gap-2 text-xs bg-vault-50 dark:bg-vault-850/60 p-3.5 rounded-2xl border border-vault-200 dark:border-vault-800">
             <div>
               <span className="text-vault-400 block text-[10px] uppercase">Storage Mode:</span>
               <span className="font-semibold text-vault-900 dark:text-vault-100">Local-First Plaintext Markdown</span>
@@ -145,8 +326,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
               <span className="font-semibold text-vault-900 dark:text-vault-100">SQLite 3 (WAL + FTS5 Full-Text)</span>
             </div>
             <div>
-              <span className="text-vault-400 block text-[10px] uppercase">PDF Engine:</span>
-              <span className="font-semibold text-vault-900 dark:text-vault-100">Headless Chromium (Playwright)</span>
+              <span className="text-vault-400 block text-[10px] uppercase">Executable Suite:</span>
+              <span className="font-semibold text-emerald-400">setup.exe • vault.exe • update.exe</span>
             </div>
             <div>
               <span className="text-vault-400 block text-[10px] uppercase">Network Mode:</span>
@@ -155,7 +336,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
           </div>
         </div>
 
-        <div className="flex justify-end pt-2 border-t border-vault-200 dark:border-vault-800">
+        <div className="flex justify-end pt-3 border-t border-vault-200 dark:border-vault-800">
           <Button variant="secondary" onClick={handleClose}>
             Close
           </Button>

@@ -74,6 +74,45 @@ class VaultManager:
         self.backups_dir.mkdir(parents=True, exist_ok=True)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
+        # Cross-link notes and attachments folder for seamless access
+        try:
+            nodes_att = self.nodes_dir / "attachments"
+            target_att = (self.attachments_dir / "images").resolve()
+            if not nodes_att.exists():
+                if os.name == "nt":
+                    import subprocess
+                    subprocess.run(["cmd", "/c", "mklink", "/J", str(nodes_att), str(target_att)], capture_output=True, check=False)
+                else:
+                    os.symlink(str(target_att), str(nodes_att), target_is_directory=True)
+        except Exception:
+            pass
+
+        try:
+            att_notes = self.attachments_dir / "notes_folder"
+            target_notes = self.nodes_dir.resolve()
+            if not att_notes.exists():
+                if os.name == "nt":
+                    import subprocess
+                    subprocess.run(["cmd", "/c", "mklink", "/J", str(att_notes), str(target_notes)], capture_output=True, check=False)
+                else:
+                    os.symlink(str(target_notes), str(att_notes), target_is_directory=True)
+        except Exception:
+            pass
+
+        # Write informative readme in attachments
+        info_file = self.attachments_dir / "images" / "_README_MEDIA.txt"
+        if not info_file.exists():
+            try:
+                info_file.write_text(
+                    "Vault Media & Attachments Folder\n"
+                    "================================\n"
+                    "All images and files pasted or attached in your notes are preserved here.\n"
+                    "This folder is directly accessible from the 'nodes/attachments' link inside your notes directory.\n",
+                    encoding="utf-8"
+                )
+            except Exception:
+                pass
+
         # Create default config if missing
         if not self.config_path.exists():
             default_config = {
@@ -84,6 +123,8 @@ class VaultManager:
                 "autosave_debounce_ms": 2000,
                 "backup_retention_count": 10,
                 "auto_backup_on_startup": False,
+                "auto_check_updates": True,
+                "theme": "obsidian",
             }
             self.save_config(default_config)
 

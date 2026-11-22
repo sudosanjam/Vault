@@ -7,7 +7,8 @@ param (
     [string]$HostIp = "127.0.0.1",
     [int]$Port = 8000,
     [switch]$NoBrowser,
-    [switch]$ForceSetup
+    [switch]$ForceSetup,
+    [switch]$Console
 )
 
 $ErrorActionPreference = "Stop"
@@ -16,7 +17,9 @@ $ProjectRoot = Split-Path -Parent $ScriptDir
 $BackendDir = Join-Path $ProjectRoot "backend"
 $FrontendDir = Join-Path $ProjectRoot "frontend"
 $VenvPython = Join-Path $BackendDir "venv\Scripts\python.exe"
+$VenvPythonw = Join-Path $BackendDir "venv\Scripts\pythonw.exe"
 $DistIndex = Join-Path $FrontendDir "dist\index.html"
+$TrayScript = Join-Path $ScriptDir "tray_app.py"
 
 # Verify initial setup requirements
 $needsSetup = $ForceSetup -or (-not (Test-Path $VenvPython)) -or (-not (Test-Path $DistIndex))
@@ -90,17 +93,36 @@ if ($existingConn) {
     }
 }
 
+if (-not $Console) {
+    # Default: Run minimized in System Tray without desktop CLI
+    Write-Host "Launching Vault minimized to System Tray..." -ForegroundColor Cyan
+    $trayArgs = @(
+        "`"$TrayScript`"",
+        "--host", $HostIp,
+        "--port", $Port.ToString(),
+        "--vault-path", "`"$VaultPath`""
+    )
+    if ($NoBrowser) {
+        $trayArgs += "--no-browser"
+    }
+
+    $runner = if (Test-Path $VenvPythonw) { $VenvPythonw } else { $VenvPython }
+    Start-Process -FilePath $runner -ArgumentList $trayArgs
+    Write-Host "[OK] Vault launched! Look for the retro Vault icon in your system tray." -ForegroundColor Green
+    Write-Host "Opening web interface at http://${HostIp}:${Port}..." -ForegroundColor Green
+    exit 0
+}
+
+# Foreground Console Mode
 Write-Host "========================================================" -ForegroundColor Cyan
 Write-Host "                    VAULT SYSTEM                        " -ForegroundColor Cyan
 Write-Host "   Local-First Personal Knowledge Graph and PKM         " -ForegroundColor Cyan
 Write-Host "========================================================" -ForegroundColor Cyan
 Write-Host "Active Vault Root : $VaultPath" -ForegroundColor Green
 Write-Host "Listening Address : http://${HostIp}:${Port}" -ForegroundColor Green
-Write-Host "Network Isolation : Loopback Only (Zero Cloud)" -ForegroundColor Gray
-Write-Host "Single-Origin SPA : Enabled (frontend\dist)" -ForegroundColor Gray
+Write-Host "Console Mode      : Interactive / Foreground" -ForegroundColor Yellow
 Write-Host "========================================================`n" -ForegroundColor Cyan
 
-# Open browser when server responds healthy
 if (-not $NoBrowser) {
     Start-Job -ScriptBlock {
         param($url)

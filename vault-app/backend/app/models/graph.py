@@ -36,3 +36,15 @@ class GraphData(BaseModel):
 
 class GraphLayoutPayload(BaseModel):
     positions: Dict[str, Dict[str, float]]  # {node_id: {x: 100, y: 200}}
+    layout_name: Optional[str] = "default"
+    set_active: bool = True
+
+
+class UpdateRelationshipPayload(BaseModel):
+    source_id: str
+    old_target_id: str
+    old_relation_type: str
+    new_target_id: str
+    new_relation_type: str = "references"
+    new_label: Optional[str] = None
+

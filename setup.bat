@@ -2,6 +2,11 @@
 setlocal
 cd /d "%~dp0"
 
+if exist "%~dp0setup.exe" (
+    "%~dp0setup.exe" %*
+    exit /b %ERRORLEVEL%
+)
+
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0vault-app\scripts\setup.ps1" %*
 set "EXIT_CODE=%ERRORLEVEL%"
 

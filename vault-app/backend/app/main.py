@@ -70,6 +70,29 @@ frontend_dist = Path(__file__).resolve().parent.parent.parent / "frontend" / "di
 if settings.FRONTEND_DIST_DIR:
     frontend_dist = Path(settings.FRONTEND_DIST_DIR).resolve()
 
+
+@app.api_route("/favicon.ico", methods=["GET", "HEAD"], include_in_schema=False)
+async def get_favicon():
+    """Explicitly serve favicon.ico for browser bookmarks and tabs."""
+    ico_dist = frontend_dist / "favicon.ico"
+    if ico_dist.exists():
+        return FileResponse(ico_dist, media_type="image/x-icon")
+    ico_public = Path(__file__).resolve().parent.parent.parent / "frontend" / "public" / "favicon.ico"
+    if ico_public.exists():
+        return FileResponse(ico_public, media_type="image/x-icon")
+    return HTMLResponse(status_code=204)
+
+
+@app.get("/attachments/{file_path:path}", include_in_schema=False)
+async def serve_direct_attachment(file_path: str):
+    """Direct URL access to vault media attachments."""
+    container = ServiceContainer.get_instance()
+    abs_path = (container.vault.root_path / "attachments" / file_path).resolve()
+    if not container.vault.is_safe_path(abs_path) or not abs_path.exists() or not abs_path.is_file():
+        raise HTTPException(status_code=404, detail="Attachment not found.")
+    return FileResponse(str(abs_path))
+
+
 if frontend_dist.exists() and (frontend_dist / "index.html").exists():
     app.mount("/assets", StaticFiles(directory=str(frontend_dist / "assets")), name="assets")
 

@@ -64,6 +64,40 @@ def test_api_note_lifecycle(client: TestClient):
     assert diag_res.status_code == 200
     assert diag_res.json()["is_vault_accessible"] is True
 
-    # 9. Delete note
+    # 9. Graph layouts & relationships API
+    layout_res = client.get("/api/v1/graph/layouts")
+    assert layout_res.status_code == 200
+
+    create_target = client.post("/api/v1/notes", json={"title": "Target Note"})
+    target_id = create_target.json()["metadata"]["id"]
+
+    rel_create = client.post(
+        "/api/v1/graph/relationships",
+        json={"source_id": note_id, "target_id": target_id, "relation_type": "references", "label": "Ref Label"},
+    )
+    assert rel_create.status_code == 200
+
+    rel_update = client.put(
+        "/api/v1/graph/relationships",
+        json={
+            "source_id": note_id,
+            "old_target_id": target_id,
+            "old_relation_type": "references",
+            "new_target_id": target_id,
+            "new_relation_type": "depends_on",
+            "new_label": "Updated Dependency",
+        },
+    )
+    assert rel_update.status_code == 200
+
+    # 10. Folder browsing API
+    browse_res = client.get("/api/v1/system/browse-folders")
+    assert browse_res.status_code == 200
+    assert "current_path" in browse_res.json()
+    assert "folders" in browse_res.json()
+
+    # 11. Delete note
     del_res = client.delete(f"/api/v1/notes/{note_id}")
     assert del_res.status_code == 204
+    client.delete(f"/api/v1/notes/{target_id}")
+

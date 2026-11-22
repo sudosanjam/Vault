@@ -1,11 +1,11 @@
 """Graph API endpoints."""
 
-from typing import Optional
+from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from app.api.deps import ServiceContainer, get_services
-from app.models.graph import GraphData, GraphLayoutPayload
+from app.models.graph import GraphData, GraphLayoutPayload, UpdateRelationshipPayload
 
 router = APIRouter(prefix="/graph", tags=["Graph"])
 
@@ -30,6 +30,7 @@ def get_graph(
     tag: Optional[str] = Query(None, description="Filter by tag"),
     note_type: Optional[str] = Query(None, description="Filter by note type"),
     include_broken: bool = Query(False, description="Include broken link edges"),
+    layout: Optional[str] = Query(None, description="Named layout to load coordinates from"),
     services: ServiceContainer = Depends(get_services),
 ):
     """Fetch graph nodes and edges for visualization."""
@@ -39,14 +40,21 @@ def get_graph(
         tag_filter=tag,
         type_filter=note_type,
         include_broken=include_broken,
+        layout_name=layout,
     )
+
+
+@router.get("/layouts")
+def get_layouts(services: ServiceContainer = Depends(get_services)) -> Dict[str, Any]:
+    """Fetch all saved named graph layouts."""
+    return services.graph_service.get_layouts()
 
 
 @router.post("/layout")
 def save_layout(payload: GraphLayoutPayload, services: ServiceContainer = Depends(get_services)):
-    """Save custom node coordinates."""
+    """Save custom node coordinates, optionally to a named layout."""
     services.graph_service.save_layout(payload)
-    return {"status": "saved"}
+    return {"status": "saved", "layout_name": payload.layout_name or "default"}
 
 
 @router.post("/relationships")
@@ -57,6 +65,23 @@ def create_relationship(payload: CreateRelationshipPayload, services: ServiceCon
             payload.source_id, payload.target_id, payload.relation_type, payload.label
         )
         return {"status": "created"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.put("/relationships")
+def update_relationship(payload: UpdateRelationshipPayload, services: ServiceContainer = Depends(get_services)):
+    """Edit an existing relationship between nodes in frontmatter."""
+    try:
+        services.graph_service.update_relationship(
+            payload.source_id,
+            payload.old_target_id,
+            payload.old_relation_type,
+            payload.new_target_id,
+            payload.new_relation_type,
+            payload.new_label,
+        )
+        return {"status": "updated"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

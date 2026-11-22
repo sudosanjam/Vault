@@ -61,7 +61,7 @@ yarn-error.log*
 *.sqlite3
 
 # --------------------------------------------------------
-# 5. OS & IDE Metadata
+# 5. OS & IDE Metadata & Dynamic Executables
 # --------------------------------------------------------
 .DS_Store
 Thumbs.db
@@ -70,3 +70,7 @@ desktop.ini
 .vscode/
 *.swp
 *.swo
+*.log
+.vault.pid
+# vault.exe is only created after running setup.exe
+vault.exe

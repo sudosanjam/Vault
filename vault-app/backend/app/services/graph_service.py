@@ -1,7 +1,7 @@
 """Graph visualization service for node neighborhoods, global graph, and layout persistence."""
 
 import json
-from typing import Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 from app.core.vault import VaultManager
 from app.db.database import Database
 from app.models.graph import GraphData, GraphEdge, GraphLayoutPayload, GraphNode
@@ -22,13 +22,21 @@ class GraphService:
         tag_filter: Optional[str] = None,
         type_filter: Optional[str] = None,
         include_broken: bool = False,
+        layout_name: Optional[str] = None,
     ) -> GraphData:
         """
         Build graph data.
         If root_id is provided, performs BFS up to `depth` from root_id.
         Otherwise, returns all vault nodes and edges filtered by tags/type.
         """
-        saved_positions = self.vault.get_graph_layouts().get("positions", {})
+        layouts_data = self.vault.get_graph_layouts()
+        chosen_layout = layout_name or layouts_data.get("active_layout", "default")
+        named_layouts = layouts_data.get("layouts", {})
+        if chosen_layout in named_layouts and "positions" in named_layouts[chosen_layout]:
+            saved_positions = named_layouts[chosen_layout]["positions"]
+        else:
+            saved_positions = layouts_data.get("positions", {})
+
 
         with self.db.get_connection() as conn:
             # 1. Fetch all nodes
@@ -140,13 +148,32 @@ class GraphService:
                 total_edges=len(edges),
             )
 
+    def get_layouts(self) -> Dict[str, Any]:
+        """Fetch all named graph layouts and the current active layout."""
+        data = self.vault.get_graph_layouts()
+        layouts = data.get("layouts", {})
+        if "positions" in data and "default" not in layouts:
+            layouts["default"] = {"positions": data["positions"]}
+        return {
+            "active_layout": data.get("active_layout", "default"),
+            "layouts": layouts,
+        }
+
     def save_layout(self, payload: GraphLayoutPayload) -> None:
-        """Save user-customized node positions."""
-        layouts = self.vault.get_graph_layouts()
-        current_pos = layouts.get("positions", {})
-        current_pos.update(payload.positions)
-        layouts["positions"] = current_pos
-        self.vault.save_graph_layouts(layouts)
+        """Save user-customized node positions, supporting named layouts."""
+        layouts_data = self.vault.get_graph_layouts()
+        layout_name = payload.layout_name or "default"
+        named_layouts = layouts_data.get("layouts", {})
+
+        existing_pos = named_layouts.get(layout_name, {}).get("positions", {})
+        existing_pos.update(payload.positions)
+        named_layouts[layout_name] = {"positions": existing_pos}
+
+        layouts_data["layouts"] = named_layouts
+        if payload.set_active:
+            layouts_data["active_layout"] = layout_name
+            layouts_data["positions"] = existing_pos
+        self.vault.save_graph_layouts(layouts_data)
 
     def create_relationship(self, source_id: str, target_id: str, relation_type: str = "references", label: Optional[str] = None) -> None:
         """Create a new typed relationship edge between two nodes in frontmatter."""
@@ -163,6 +190,34 @@ class GraphService:
         new_relations = list(existing) + [NoteRelation(target_id=target_id, type=relation_type, label=label)]
         self.note_service.update_note(source_id, NoteUpdateRequest(relations=new_relations))
 
+    def update_relationship(
+        self,
+        source_id: str,
+        old_target_id: str,
+        old_relation_type: str,
+        new_target_id: str,
+        new_relation_type: str = "references",
+        new_label: Optional[str] = None,
+    ) -> None:
+        """Edit an existing typed relationship in frontmatter."""
+        source_note = self.note_service.get_note_by_id(source_id)
+        if not source_note:
+            raise ValueError(f"Source note '{source_id}' not found.")
+        
+        new_relations = []
+        replaced = False
+        for r in source_note.metadata.relations:
+            if not replaced and r.target_id == old_target_id and r.type == old_relation_type:
+                new_relations.append(NoteRelation(target_id=new_target_id, type=new_relation_type, label=new_label))
+                replaced = True
+            else:
+                new_relations.append(r)
+        
+        if not replaced:
+            new_relations.append(NoteRelation(target_id=new_target_id, type=new_relation_type, label=new_label))
+            
+        self.note_service.update_note(source_id, NoteUpdateRequest(relations=new_relations))
+
     def delete_relationship(self, source_id: str, target_id: str, relation_type: str) -> None:
         """Remove a typed relationship from source note frontmatter."""
         source_note = self.note_service.get_note_by_id(source_id)
@@ -171,3 +226,4 @@ class GraphService:
         
         filtered = [r for r in source_note.metadata.relations if not (r.target_id == target_id and r.type == relation_type)]
         self.note_service.update_note(source_id, NoteUpdateRequest(relations=filtered))
+
