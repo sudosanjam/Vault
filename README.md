@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="vault-app/frontend/public/favicon.svg" alt="Vault Logo" width="100" height="96" />
+  <img src="vault-app/frontend/public/logo.png" alt="Vault Logo" width="120" height="120" />
 </p>
 
 # Vault: Local-First Personal Knowledge Graph System
@@ -18,6 +18,7 @@ Vault is a production-quality, local-first personal knowledge management applica
 - **First-Time Setup:** Run [`setup.exe`](setup.exe)
   - Vintage PC installer console that validates Python 3 and Node.js, installs dependencies, builds the frontend, links attachments, and **generates `vault.exe`**.
 - **Launch Vault:** Double-click [`vault.exe`](vault.exe) (generated upon running `setup.exe`).
+- **Official Icon:** Multi-resolution executable & desktop icon: [`vault.ico`](vault.ico)
 - **Update Application:** Run [`update.exe`](update.exe)
   - Checks GitHub (`sudosanjam/Vault`) for incoming patches, compares commits, pulls updates, rebuilds the application, and relaunches `vault.exe`.
 - **Scripts Alternative:** [`start.bat`](start.bat) / [`start.ps1`](start.ps1) and [`stop.bat`](stop.bat) / [`stop.ps1`](stop.ps1).

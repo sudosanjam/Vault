@@ -108,7 +108,7 @@ export const Header: React.FC = () => {
           >
             <div className="w-7 h-7 rounded-lg overflow-hidden flex items-center justify-center shadow-xs transition-transform group-hover:scale-105 active:scale-95">
               <img
-                src="/favicon.svg"
+                src="/logo.png"
                 alt="Vault"
                 className={`w-6 h-6 object-contain transition-transform duration-500 ${isRefreshing ? 'animate-spin' : ''}`}
               />
