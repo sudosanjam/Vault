@@ -3,11 +3,14 @@
 Provides a Windows system tray icon with menu options (Open, Show Logs, Open Folder, Exit),
 starts the backend server in background without desktop CLI clutter, and automatically
 launches the web interface in the user's default browser once healthy.
+Listens on 0.0.0.0 so both PC localhost and local Wi-Fi devices (Android/Termux) can connect.
 """
 
 import argparse
+import json
 import os
 import signal
+import socket
 import subprocess
 import sys
 import threading
@@ -34,26 +37,56 @@ if not os.path.exists(ICON_PATH):
 
 LOG_FILE = os.path.join(BACKEND_DIR, "vault_server.log")
 PID_FILE = os.path.join(BACKEND_DIR, ".vault.pid")
+SESSION_FILE = os.path.join(WORKSPACE_ROOT, "vault_session.json")
+
+
+def get_lan_ip():
+    """Detect LAN IPv4 address for local network access."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
 
 
 class VaultTrayApp:
-    def __init__(self, host="127.0.0.1", port=8000, vault_path=None, no_browser=False):
+    def __init__(self, host="0.0.0.0", port=8000, vault_path=None, no_browser=False):
         self.host = host
         self.port = port
         self.no_browser = no_browser
-        self.url = f"http://{self.host}:{self.port}"
+        self.lan_ip = get_lan_ip()
+        self.local_url = f"http://127.0.0.1:{self.port}"
+        self.lan_url = f"http://{self.lan_ip}:{self.port}"
+        self.url = self.local_url
         
-        # Determine vault directory
+        # Determine vault directory: CLI override -> persistent session -> environment -> defaults
         if vault_path:
             self.vault_path = os.path.abspath(vault_path)
         elif os.environ.get("VAULT_DIRECTORY"):
             self.vault_path = os.path.abspath(os.environ["VAULT_DIRECTORY"])
         else:
-            sample_vault = os.path.join(WORKSPACE_ROOT, "VaultSample")
-            if os.path.exists(sample_vault):
-                self.vault_path = sample_vault
+            persisted = None
+            if os.path.exists(SESSION_FILE):
+                try:
+                    with open(SESSION_FILE, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                        p = data.get("active_vault_path")
+                        if p and os.path.exists(p) and os.path.isdir(p):
+                            persisted = os.path.abspath(p)
+                except Exception:
+                    pass
+            
+            if persisted:
+                self.vault_path = persisted
             else:
-                self.vault_path = os.path.join(WORKSPACE_ROOT, "VaultData")
+                sample_vault = os.path.join(WORKSPACE_ROOT, "VaultSample")
+                if os.path.exists(sample_vault):
+                    self.vault_path = sample_vault
+                else:
+                    self.vault_path = os.path.join(WORKSPACE_ROOT, "VaultData")
 
         os.makedirs(self.vault_path, exist_ok=True)
         self.server_process = None
@@ -63,7 +96,7 @@ class VaultTrayApp:
 
     def is_server_healthy(self, timeout=1.5):
         try:
-            req = urllib.request.Request(f"{self.url}/health", headers={"User-Agent": "Vault-Tray/1.0"})
+            req = urllib.request.Request(f"{self.local_url}/health", headers={"User-Agent": "Vault-Tray/1.0"})
             with urllib.request.urlopen(req, timeout=timeout) as response:
                 return response.status == 200
         except Exception:
@@ -74,13 +107,16 @@ class VaultTrayApp:
         env["VAULT_DIRECTORY"] = self.vault_path
         env["HOST"] = self.host
         env["PORT"] = str(self.port)
+        env["ALLOW_LAN"] = "true"
 
         # Open log file in append mode
         self.log_handle = open(LOG_FILE, "a", encoding="utf-8")
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
         self.log_handle.write(f"\n--- Vault Session Started at {timestamp} ---\n")
         self.log_handle.write(f"Active Vault Path: {self.vault_path}\n")
-        self.log_handle.write(f"Listening Address: {self.url}\n")
+        self.log_handle.write(f"Listening Address: {self.host}:{self.port}\n")
+        self.log_handle.write(f"Local Access URL : {self.local_url}\n")
+        self.log_handle.write(f"Phone / LAN URL  : {self.lan_url}\n")
         self.log_handle.flush()
 
         creation_flags = 0x08000000 if os.name == "nt" else 0  # CREATE_NO_WINDOW
@@ -158,13 +194,13 @@ class VaultTrayApp:
             if self.is_server_healthy():
                 if self.icon:
                     try:
-                        self.icon.notify(f"Vault server is back online at {self.url}", "Vault PKM")
+                        self.icon.notify(f"Vault server is back online at {self.local_url}\nPhone access: {self.lan_url}", "Vault PKM")
                     except Exception:
                         pass
                 break
 
     def open_browser(self, icon=None, item_menu=None):
-        webbrowser.open(self.url)
+        webbrowser.open(self.local_url)
 
     def open_vault_folder(self, icon=None, item_menu=None):
         try:
@@ -178,8 +214,7 @@ class VaultTrayApp:
     def show_console_logs(self, icon=None, item_menu=None):
         """Open a live streaming console log window for server inspection."""
         if os.name == "nt":
-            # Launch PowerShell tailing the log file in a new interactive console
-            cmd = f"$host.UI.RawUI.WindowTitle = 'Vault Server Logs - {self.url}'; Write-Host 'Tailing Vault Server Logs (Close this window to return to tray)...' -ForegroundColor Cyan; Get-Content -Path '{LOG_FILE}' -Wait -Tail 40"
+            cmd = f"$host.UI.RawUI.WindowTitle = 'Vault Server Logs - {self.local_url} | {self.lan_url}'; Write-Host 'Tailing Vault Server Logs (Close this window to return to tray)...' -ForegroundColor Cyan; Write-Host 'PC: {self.local_url} | Phone/LAN: {self.lan_url}' -ForegroundColor Green; Get-Content -Path '{LOG_FILE}' -Wait -Tail 40"
             subprocess.Popen(["powershell.exe", "-NoExit", "-Command", cmd])
         else:
             subprocess.Popen(["xterm", "-e", f"tail -f '{LOG_FILE}'"])
@@ -188,11 +223,23 @@ class VaultTrayApp:
         try:
             if os.name == "nt":
                 subprocess.run(
-                    ["powershell", "-NoProfile", "-Command", f"Set-Clipboard -Value '{self.url}'"],
+                    ["powershell", "-NoProfile", "-Command", f"Set-Clipboard -Value '{self.local_url}'"],
                     check=False,
                 )
                 if self.icon:
-                    self.icon.notify(f"Copied {self.url} to clipboard!", "Vault PKM")
+                    self.icon.notify(f"Copied {self.local_url} to clipboard!", "Vault PKM")
+        except Exception:
+            pass
+
+    def copy_lan_url_to_clipboard(self, icon=None, item_menu=None):
+        try:
+            if os.name == "nt":
+                subprocess.run(
+                    ["powershell", "-NoProfile", "-Command", f"Set-Clipboard -Value '{self.lan_url}'"],
+                    check=False,
+                )
+                if self.icon:
+                    self.icon.notify(f"Copied LAN Address: {self.lan_url} (for Phone/Termux)", "Vault PKM")
         except Exception:
             pass
 
@@ -211,11 +258,11 @@ class VaultTrayApp:
             time.sleep(0.25)
             if self.is_server_healthy():
                 if not self.no_browser:
-                    webbrowser.open(self.url)
+                    webbrowser.open(self.local_url)
                 if self.icon:
                     try:
                         self.icon.notify(
-                            f"Vault is online at {self.url}\nRunning minimized to system tray.",
+                            f"Vault is online at {self.local_url}\nPhone / Wi-Fi Sync: {self.lan_url}",
                             "Vault PKM",
                         )
                     except Exception:
@@ -225,7 +272,7 @@ class VaultTrayApp:
     def run(self):
         # 1. Check if an instance is already running
         if self.is_server_healthy():
-            print(f"[INFO] Vault is already running at {self.url}")
+            print(f"[INFO] Vault is already running at {self.local_url} (LAN: {self.lan_url})")
             if not self.no_browser:
                 self.open_browser()
             sys.exit(0)
@@ -248,15 +295,15 @@ class VaultTrayApp:
                 pass
 
         if image is None:
-            # Fallback icon: create a 64x64 colored square
             image = Image.new("RGBA", (64, 64), (99, 102, 241, 255))
 
         # 5. Build system tray menu
         menu = pystray.Menu(
             item("🌐 Open Vault in Browser", self.open_browser, default=True),
+            item(f"📱 Copy Phone / LAN URL ({self.lan_ip}:{self.port})", self.copy_lan_url_to_clipboard),
             item("📂 Open Vault Folder", self.open_vault_folder),
             item("🖥️ Show Server Logs / CLI", self.show_console_logs),
-            item("📋 Copy Address to Clipboard", self.copy_url_to_clipboard),
+            item("📋 Copy PC Address to Clipboard", self.copy_url_to_clipboard),
             pystray.Menu.SEPARATOR,
             item("🔄 Restart Server", self.restart_server),
             item("❌ Exit Vault", self.exit_app),
@@ -265,11 +312,10 @@ class VaultTrayApp:
         self.icon = pystray.Icon(
             "Vault",
             image,
-            f"Vault — Personal Knowledge Graph ({self.url})",
+            f"Vault — Personal Knowledge Graph\nPC: {self.local_url}\nPhone: {self.lan_url}",
             menu=menu,
         )
 
-        # Handle signals gracefully
         def signal_handler(sig, frame):
             self.exit_app()
 
@@ -284,7 +330,7 @@ class VaultTrayApp:
 
 def main():
     parser = argparse.ArgumentParser(description="Vault System Tray Application")
-    parser.add_argument("--host", default="127.0.0.1", help="Host IP address (default: 127.0.0.1)")
+    parser.add_argument("--host", default="0.0.0.0", help="Host IP address (default: 0.0.0.0 for LAN access)")
     parser.add_argument("--port", type=int, default=8000, help="Port (default: 8000)")
     parser.add_argument("--vault-path", default="", help="Path to vault notes directory")
     parser.add_argument("--no-browser", action="store_true", help="Do not open browser on startup")

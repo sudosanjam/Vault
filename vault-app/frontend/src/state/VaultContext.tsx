@@ -61,6 +61,8 @@ export interface VaultContextType {
   setCreateNoteModalOpen: (open: boolean) => void;
   vaultPickerModalOpen: boolean;
   setVaultPickerModalOpen: (open: boolean) => void;
+  syncModalOpen: boolean;
+  setSyncModalOpen: (open: boolean) => void;
   noteLockModalOpen: boolean;
   setNoteLockModalOpen: (open: boolean) => void;
 
@@ -135,6 +137,7 @@ export const VaultProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [diagnosticsModalOpen, setDiagnosticsModalOpen] = useState(false);
   const [createNoteModalOpen, setCreateNoteModalOpen] = useState(false);
   const [vaultPickerModalOpen, setVaultPickerModalOpen] = useState(false);
+  const [syncModalOpen, setSyncModalOpen] = useState(false);
   const [noteLockModalOpen, setNoteLockModalOpen] = useState(false);
 
   // In-session unlocked passwords: noteId -> password
@@ -546,6 +549,8 @@ export const VaultProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setCreateNoteModalOpen,
         vaultPickerModalOpen,
         setVaultPickerModalOpen,
+        syncModalOpen,
+        setSyncModalOpen,
         noteLockModalOpen,
         setNoteLockModalOpen,
         isNoteLocked,

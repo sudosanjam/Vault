@@ -1,7 +1,7 @@
 # Root Launch Script for Vault (PowerShell)
 param (
     [string]$VaultPath = "",
-    [string]$HostIp = "127.0.0.1",
+    [string]$HostIp = "0.0.0.0",
     [int]$Port = 8000,
     [switch]$NoBrowser,
     [switch]$ForceSetup

@@ -322,6 +322,8 @@ export const api = {
       lan_enabled: boolean;
       server_ip: string;
       port: number;
+      local_url?: string;
+      lan_url?: string;
       vault_path: string;
       app: string;
     }>(`${API_BASE}/sync/info`),
@@ -343,5 +345,38 @@ export const api = {
       notes: { id: string; filename: string; file_hash: string; modified_at: string; size_bytes: number }[];
       attachments: { name: string; relative_path: string; file_hash: string; modified_at: string; size_bytes: number }[];
     }>(`${API_BASE}/sync/manifest`),
+  getSyncPeers: (scan: boolean = true) =>
+    fetchJson<{
+      my_ip: string;
+      my_port: number;
+      my_url: string;
+      remembered_peer: string | null;
+      last_sync_time: string | null;
+      discovered_peers: {
+        ip: string;
+        port: number;
+        url: string;
+        vault_name: string;
+        version: string;
+      }[];
+    }>(`${API_BASE}/sync/peers?scan=${scan ? 'true' : 'false'}`),
+  syncWithPeer: (peer_url: string, direction: 'bidirectional' | 'pull' | 'push' = 'bidirectional') =>
+    fetchJson<{
+      status: string;
+      peer_url: string;
+      peer_vault_name: string;
+      direction: string;
+      notes_pulled: number;
+      notes_pushed: number;
+      images_pulled: number;
+      images_pushed: number;
+      total_synced: number;
+      synced_at: string;
+      message: string;
+    }>(`${API_BASE}/sync/sync-with-peer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ peer_url, direction }),
+    }),
 };
 

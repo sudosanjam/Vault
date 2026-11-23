@@ -4,7 +4,7 @@
 
 param (
     [string]$VaultPath = "",
-    [string]$HostIp = "127.0.0.1",
+    [string]$HostIp = "0.0.0.0",
     [int]$Port = 8000,
     [switch]$NoBrowser,
     [switch]$ForceSetup,
@@ -44,7 +44,20 @@ if (-not (Test-Path $VenvPython)) {
     exit 1
 }
 
-# Determine default vault path if not specified
+# Determine default vault path: check persistent session first
+if (-not $VaultPath) {
+    $parentDir = Split-Path -Parent $ProjectRoot
+    $sessionFile = Join-Path $parentDir "vault_session.json"
+    if (Test-Path $sessionFile) {
+        try {
+            $sess = Get-Content $sessionFile -Raw | ConvertFrom-Json
+            if ($sess.active_vault_path -and (Test-Path $sess.active_vault_path)) {
+                $VaultPath = $sess.active_vault_path
+            }
+        } catch {}
+    }
+}
+
 if (-not $VaultPath) {
     $parentDir = Split-Path -Parent $ProjectRoot
     $sampleVault = Join-Path $parentDir "VaultSample"
@@ -63,6 +76,15 @@ if (-not (Test-Path $VaultPath)) {
 $env:VAULT_DIRECTORY = $VaultPath
 $env:HOST = $HostIp
 $env:PORT = $Port.ToString()
+$env:ALLOW_LAN = "true"
+
+# Ensure Windows Firewall allows LAN sync connections on Port
+try {
+    $fw = Get-NetFirewallRule -DisplayName "Vault PKM Server" -ErrorAction SilentlyContinue
+    if (-not $fw) {
+        New-NetFirewallRule -DisplayName "Vault PKM Server" -Direction Inbound -LocalPort $Port -Protocol TCP -Action Allow -ErrorAction SilentlyContinue | Out-Null
+    }
+} catch {}
 
 # Check for existing active port listener
 $existingConn = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
@@ -70,7 +92,7 @@ if ($existingConn) {
     $owningPid = $existingConn[0].OwningProcess
     $isVaultRunning = $false
     try {
-        $health = Invoke-RestMethod -Uri "http://${HostIp}:${Port}/health" -TimeoutSec 2 -ErrorAction SilentlyContinue
+        $health = Invoke-RestMethod -Uri "http://127.0.0.1:${Port}/health" -TimeoutSec 2 -ErrorAction SilentlyContinue
         if ($health -and $health.app -eq "Vault") {
             $isVaultRunning = $true
         }

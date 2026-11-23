@@ -18,6 +18,7 @@ import { ImportModal } from './components/modals/ImportModal';
 import { DiagnosticsModal } from './components/modals/DiagnosticsModal';
 import { SettingsModal } from './components/modals/SettingsModal';
 import { VaultPickerModal } from './components/modals/VaultPickerModal';
+import { SyncModal } from './components/modals/SyncModal';
 
 
 import {
@@ -244,6 +245,7 @@ const MainLayout: React.FC = () => {
       <DiagnosticsModal isOpen={diagnosticsModalOpen} onClose={() => setDiagnosticsModalOpen(false)} />
       <SettingsModal isOpen={settingsModalOpen} onClose={() => setSettingsModalOpen(false)} />
       <VaultPickerModal isOpen={vaultPickerModalOpen} onClose={() => setVaultPickerModalOpen(false)} />
+      <SyncModal />
     </div>
 
   );

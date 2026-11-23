@@ -19,6 +19,7 @@ import {
   SlidersHorizontal,
   Table,
   Sparkles,
+  Wifi,
 } from 'lucide-react';
 import { useTheme } from '../../state/ThemeContext';
 import { useVault } from '../../state/VaultContext';
@@ -44,6 +45,7 @@ export const Header: React.FC = () => {
     setDiagnosticsModalOpen,
     setCreateNoteModalOpen,
     setVaultPickerModalOpen,
+    setSyncModalOpen,
   } = useVault();
 
   const [toolsMenuOpen, setToolsMenuOpen] = useState(false);
@@ -303,6 +305,17 @@ export const Header: React.FC = () => {
           )}
         </div>
 
+        {/* Mobile & LAN Sync Button */}
+        <button
+          type="button"
+          onClick={() => setSyncModalOpen(true)}
+          title="Sync notes with Android / PC over local Wi-Fi"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border border-vault-200 dark:border-vault-700/80 bg-vault-50/80 dark:bg-vault-800/60 hover:bg-vault-100 dark:hover:bg-vault-700/70 text-vault-700 dark:text-vault-200 hover:border-teal-500/50 hover:text-teal-400 dark:hover:text-teal-300 transition-all shadow-2xs"
+        >
+          <Wifi size={13} className="text-teal-400" />
+          <span className="hidden sm:inline">Sync</span>
+        </button>
+
         {/* Primary New Note Action */}
         <Button
           variant="primary"
@@ -363,6 +376,19 @@ export const Header: React.FC = () => {
                 <div>
                   <div className="font-semibold">Switch Vault</div>
                   <div className="text-[10px] text-vault-400">Explore & manage locations</div>
+                </div>
+              </button>
+              <button
+                onClick={() => {
+                  setToolsMenuOpen(false);
+                  setSyncModalOpen(true);
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-vault-100 dark:hover:bg-vault-800 text-vault-700 dark:text-vault-200 transition-colors text-left"
+              >
+                <Wifi size={14} className="text-teal-400" />
+                <div>
+                  <div className="font-semibold">Mobile & LAN Sync</div>
+                  <div className="text-[10px] text-vault-400">Sync with Phone or PC over Wi-Fi</div>
                 </div>
               </button>
               <div className="border-t border-vault-200 dark:border-vault-800 my-1" />

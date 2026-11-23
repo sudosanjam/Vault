@@ -72,5 +72,7 @@ desktop.ini
 *.swo
 *.log
 .vault.pid
+vault_session.json
+.vault-session.json
 # vault.exe is only created after running setup.exe
 vault.exe

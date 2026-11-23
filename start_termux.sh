@@ -11,7 +11,7 @@ PROJECT_ROOT="$SCRIPT_DIR/vault-app"
 BACKEND_DIR="$PROJECT_ROOT/backend"
 VENV_PYTHON="$BACKEND_DIR/venv/bin/python"
 
-HOST_IP="127.0.0.1"
+HOST_IP="0.0.0.0"
 PORT=8000
 NO_BROWSER=false
 
@@ -73,7 +73,11 @@ if command -v ss >/dev/null 2>&1; then
 fi
 
 open_android_browser() {
-    local url="http://${HOST_IP}:${PORT}"
+    local browser_host="$HOST_IP"
+    if [ "$browser_host" = "0.0.0.0" ]; then
+        browser_host="127.0.0.1"
+    fi
+    local url="http://${browser_host}:${PORT}"
     if [ "$NO_BROWSER" = true ]; then
         return
     fi
@@ -98,9 +102,9 @@ open_android_browser() {
 }
 
 if [ -n "$PORT_ACTIVE" ]; then
-    if curl -s -m 2 "http://$HOST_IP:$PORT/health" | grep -q '"app":"Vault"'; then
+    if curl -s -m 2 "http://127.0.0.1:$PORT/health" | grep -q '"app":"Vault"'; then
         echo -e "${CYAN}========================================================${NC}"
-        echo -e "${CYAN}[INFO] Vault is already running on http://$HOST_IP:$PORT!${NC}"
+        echo -e "${CYAN}[INFO] Vault is already running on http://127.0.0.1:$PORT!${NC}"
         echo -e "${CYAN}========================================================${NC}"
         open_android_browser
         echo -e "Opening Android browser..."

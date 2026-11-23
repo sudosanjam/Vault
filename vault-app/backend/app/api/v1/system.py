@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from app.api.deps import ServiceContainer, get_services
+from app.config import persist_active_vault_path
 from app.models.diagnostics import SystemDiagnostics
 
 router = APIRouter(prefix="/system", tags=["System"])
@@ -66,11 +67,12 @@ def update_config(
 
 @router.post("/switch-vault")
 def switch_vault(payload: ReconfigureVaultPayload):
-    """Switch active vault directory without restarting server."""
+    """Switch active vault directory without restarting server and persist selection."""
     new_path = Path(payload.vault_path).resolve()
     if not new_path.exists():
         new_path.mkdir(parents=True, exist_ok=True)
     
+    persist_active_vault_path(new_path)
     new_container = ServiceContainer.reconfigure_vault_path(new_path)
     new_container.indexer.rebuild_full_index()
     return {
@@ -157,6 +159,7 @@ def create_vault(payload: CreateVaultPayload):
     new_vault_dir.mkdir(parents=True, exist_ok=True)
     
     # Initialize and switch
+    persist_active_vault_path(new_vault_dir)
     new_container = ServiceContainer.reconfigure_vault_path(new_vault_dir)
     new_container.indexer.rebuild_full_index()
     return {
