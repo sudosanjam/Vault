@@ -23,8 +23,8 @@ GRAY='\033[0;90m'
 NC='\033[0m'
 
 # Check if setup is needed
-if [ ! -f "$VENV_PYTHON" ] || [ ! -f "$PROJECT_ROOT/frontend/dist/index.html" ]; then
-    echo -e "${YELLOW}[!] Setup not detected. Running install_termux.sh first...${NC}"
+if [ ! -f "$VENV_PYTHON" ] || [ ! -f "$PROJECT_ROOT/frontend/dist/index.html" ] || ! "$VENV_PYTHON" -c "import fastapi, uvicorn" >/dev/null 2>&1; then
+    echo -e "${YELLOW}[!] Setup incomplete or environment not detected. Running install_termux.sh...${NC}"
     exec "$SCRIPT_DIR/install_termux.sh"
 fi
 
