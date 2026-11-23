@@ -50,6 +50,14 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Resolve active vault directory
+# Check if persistent session file specifies custom vault first
+if [ -z "$VAULT_DIRECTORY" ] && [ -f "$SCRIPT_DIR/vault_session.json" ]; then
+    SAVED_PATH=$(grep '"active_vault_path"' "$SCRIPT_DIR/vault_session.json" 2>/dev/null | sed -E 's/.*"active_vault_path": *"([^"]+)".*/\1/' || true)
+    if [ -n "$SAVED_PATH" ] && [ -d "$SAVED_PATH" ]; then
+        VAULT_DIRECTORY="$SAVED_PATH"
+    fi
+fi
+
 # If Android shared storage is set up, prefer storing in shared Documents or local
 if [ -z "$VAULT_DIRECTORY" ]; then
     if [ -d "$HOME/storage/shared/Documents/Vault" ]; then

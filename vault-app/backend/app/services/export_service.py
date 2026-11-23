@@ -9,6 +9,7 @@ import re
 import shutil
 import tempfile
 from typing import Any, Dict, List, Optional, Set, Tuple
+import urllib.parse
 import zipfile
 
 import markdown
@@ -364,28 +365,74 @@ class ExportService:
         processed_body = re.sub(r"\[\[([^\]\|#]+)(?:#([^\]\|]+))?(?:\|([^\]]+))?\]\]", _link_replacer, body)
 
         # 2. Embed images as base64 data URIs for standalone PDF/HTML rendering
-        def _img_replacer(m: re.Match) -> str:
+        def _md_img_replacer(m: re.Match) -> str:
             alt = m.group(1) or ""
-            rel_path = m.group(2)
-            abs_path = self.vault.root_path / rel_path
-            if abs_path.exists() and abs_path.is_file():
-                try:
-                    mime, _ = mimetypes.guess_type(str(abs_path))
-                    mime = mime or "image/png"
-                    img_b64 = base64.b64encode(abs_path.read_bytes()).decode("utf-8")
-                    return f"![{alt}](data:{mime};base64,{img_b64})"
-                except Exception:
-                    return m.group(0)
+            src = m.group(2) or ""
+            data_uri = self._resolve_image_to_base64(src)
+            if data_uri:
+                return f"![{alt}]({data_uri})"
             return m.group(0)
 
-        processed_body = re.sub(r"!\[(.*?)\]\((attachments/[^)]+)\)", _img_replacer, processed_body)
+        processed_body = re.sub(r"!\[(.*?)\]\(([^)]+)\)", _md_img_replacer, processed_body)
 
         # 3. Convert Markdown to HTML
         html = markdown.markdown(
             processed_body,
             extensions=["tables", "fenced_code", "nl2br", "sane_lists", "toc"],
         )
+
+        # 4. Resolve any HTML <img src="..."> tags (e.g. from Tiptap or rich paste)
+        def _html_img_replacer(m: re.Match) -> str:
+            prefix = m.group(1)
+            src = m.group(2)
+            suffix = m.group(3)
+            data_uri = self._resolve_image_to_base64(src)
+            if data_uri:
+                return f'<img{prefix}src="{data_uri}"{suffix}>'
+            return m.group(0)
+
+        html = re.sub(r'<img([^>]+?)src=["\']([^"\']+)["\']([^>]*?)>', _html_img_replacer, html)
         return html
+
+    def _resolve_image_to_base64(self, raw_src: str) -> Optional[str]:
+        """Resolve a local image reference or attachment URL to an inline base64 data URI."""
+        if not raw_src:
+            return None
+        cleaned_src = raw_src.strip()
+        if cleaned_src.startswith("data:"):
+            return cleaned_src
+        
+        # Decode any URL encoded components (e.g. %20 or %2F)
+        decoded = urllib.parse.unquote(cleaned_src)
+        
+        # Strip API prefix if present
+        if "/api/v1/attachments/file/" in decoded:
+            decoded = decoded.split("/api/v1/attachments/file/", 1)[1]
+        elif decoded.startswith("/"):
+            decoded = decoded.lstrip("/")
+
+        candidates = [
+            self.vault.root_path / decoded,
+            self.vault.attachments_dir / decoded,
+            self.vault.attachments_dir / "images" / decoded,
+            self.vault.attachments_dir / "images" / Path(decoded).name,
+            self.vault.attachments_dir / Path(decoded).name,
+            self.vault.root_path / "attachments" / decoded,
+            self.vault.root_path / "attachments" / "images" / Path(decoded).name,
+        ]
+
+        for p in candidates:
+            try:
+                resolved = p.resolve()
+                if resolved.exists() and resolved.is_file():
+                    mime, _ = mimetypes.guess_type(str(resolved))
+                    mime = mime or "image/png"
+                    img_b64 = base64.b64encode(resolved.read_bytes()).decode("utf-8")
+                    return f"data:{mime};base64,{img_b64}"
+            except Exception:
+                continue
+
+        return None
 
     def _export_pdf(
         self, notes: List[Dict[str, Any]], doc_title: str, req: ExportRequest, safe_title: str, now_str: str

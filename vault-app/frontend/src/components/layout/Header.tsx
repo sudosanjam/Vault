@@ -18,22 +18,20 @@ import {
   SidebarOpen,
   SlidersHorizontal,
   Table,
-  Sparkles,
   Wifi,
 } from 'lucide-react';
-import { useTheme } from '../../state/ThemeContext';
 import { useVault } from '../../state/VaultContext';
 import { api } from '../../api/client';
 import { Button } from '../ui/Button';
 
 export const Header: React.FC = () => {
-  const { theme, setTheme, currentThemeDef, availableThemes } = useTheme();
   const {
     activeView,
     setActiveView,
     saveStatus,
     saveError,
     vaultInfo,
+    refreshVault,
     isLeftPaneOpen,
     isRightPaneOpen,
     toggleLeftPane,
@@ -49,21 +47,17 @@ export const Header: React.FC = () => {
   } = useVault();
 
   const [toolsMenuOpen, setToolsMenuOpen] = useState(false);
-  const [themeMenuOpen, setThemeMenuOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState<boolean>(false);
   const [latestCommit, setLatestCommit] = useState<string>('');
 
   const toolsMenuRef = useRef<HTMLDivElement>(null);
-  const themeMenuRef = useRef<HTMLDivElement>(null);
 
   // Close menus when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (toolsMenuRef.current && !toolsMenuRef.current.contains(e.target as Node)) {
         setToolsMenuOpen(false);
-      }
-      if (themeMenuRef.current && !themeMenuRef.current.contains(e.target as Node)) {
-        setThemeMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -101,18 +95,28 @@ export const Header: React.FC = () => {
         </button>
 
         <div className="flex items-center gap-2.5">
-          <div
-            className="flex items-center gap-2 cursor-pointer group"
-            onClick={() => setSettingsModalOpen(true)}
-            title="Vault Preferences"
+          <button
+            type="button"
+            onClick={() => {
+              setIsRefreshing(true);
+              refreshVault().finally(() => {
+                setTimeout(() => setIsRefreshing(false), 500);
+              });
+            }}
+            className="flex items-center gap-2 cursor-pointer group focus:outline-none"
+            title="Vault - Click to refresh vault"
           >
-            <div className="w-7 h-7 rounded-lg bg-[var(--accent-muted)] border border-[var(--accent-primary)]/30 flex items-center justify-center text-[var(--accent-primary)] shadow-xs transition-transform group-hover:scale-105">
-              <Sparkles size={14} />
+            <div className="w-7 h-7 rounded-lg overflow-hidden flex items-center justify-center shadow-xs transition-transform group-hover:scale-105 active:scale-95">
+              <img
+                src="/favicon.svg"
+                alt="Vault"
+                className={`w-6 h-6 object-contain transition-transform duration-500 ${isRefreshing ? 'animate-spin' : ''}`}
+              />
             </div>
             <span className="font-extrabold text-sm tracking-tight text-vault-900 dark:text-vault-50">
               Vault
             </span>
-          </div>
+          </button>
 
           {/* Clean Apple-style Vault Folder Button */}
           <button
@@ -226,82 +230,6 @@ export const Header: React.FC = () => {
             <span className="text-[11px] text-red-400" title={saveError || 'Save failed'}>
               Error
             </span>
-          )}
-        </div>
-
-        {/* Quick Theme Switcher Pill */}
-        <div className="relative" ref={themeMenuRef}>
-          <button
-            type="button"
-            onClick={() => setThemeMenuOpen(!themeMenuOpen)}
-            className="flex items-center gap-2 px-2.5 py-1.5 rounded-full bg-vault-100/80 hover:bg-vault-200 dark:bg-vault-800/80 dark:hover:bg-vault-700/80 border border-vault-200 dark:border-vault-700/60 text-xs text-vault-800 dark:text-vault-200 font-medium transition-all"
-            title={`Current Theme: ${currentThemeDef.name} (${currentThemeDef.atmosphere})`}
-          >
-            <div className="flex items-center -space-x-1">
-              <span
-                className="w-2.5 h-2.5 rounded-full border border-black/50"
-                style={{ backgroundColor: currentThemeDef.baseCanvas }}
-              />
-              <span
-                className="w-2.5 h-2.5 rounded-full border border-black/50"
-                style={{ backgroundColor: currentThemeDef.accentPrimary }}
-              />
-              <span
-                className="w-2.5 h-2.5 rounded-full border border-black/50"
-                style={{ backgroundColor: currentThemeDef.accentSecondary }}
-              />
-            </div>
-            <span className="hidden sm:inline text-[11px] font-semibold">{currentThemeDef.name}</span>
-            <ChevronDown size={11} className="text-vault-400" />
-          </button>
-
-          {/* Theme Dropdown Popover */}
-          {themeMenuOpen && (
-            <div className="absolute right-0 mt-2 w-64 bg-vault-900/95 backdrop-blur-2xl border border-vault-700/80 rounded-2xl shadow-2xl p-2 z-50 animate-scale-in text-xs space-y-1">
-              <div className="px-2.5 py-1 text-[10px] font-bold text-vault-400 uppercase tracking-wider">
-                Select Theme Palette
-              </div>
-              {availableThemes.map((t) => {
-                const isSelected = theme === t.id;
-                return (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => {
-                      setTheme(t.id);
-                      setThemeMenuOpen(false);
-                    }}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all text-left ${
-                      isSelected
-                        ? 'bg-[var(--accent-muted)] text-[var(--accent-primary)] font-bold'
-                        : 'text-vault-300 hover:text-white hover:bg-vault-800/80'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="flex items-center -space-x-1 shrink-0">
-                        <span
-                          className="w-3 h-3 rounded-full border border-black/50"
-                          style={{ backgroundColor: t.baseCanvas }}
-                        />
-                        <span
-                          className="w-3 h-3 rounded-full border border-black/50"
-                          style={{ backgroundColor: t.accentPrimary }}
-                        />
-                        <span
-                          className="w-3 h-3 rounded-full border border-black/50"
-                          style={{ backgroundColor: t.accentSecondary }}
-                        />
-                      </div>
-                      <div className="truncate">
-                        <div className="text-xs font-semibold">{t.name}</div>
-                        <div className="text-[10px] text-vault-400 truncate">{t.atmosphere}</div>
-                      </div>
-                    </div>
-                    {isSelected && <span className="text-xs font-bold text-[var(--accent-primary)] shrink-0">✓</span>}
-                  </button>
-                );
-              })}
-            </div>
           )}
         </div>
 

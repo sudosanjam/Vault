@@ -93,16 +93,19 @@ def persist_active_vault_path(path: Path) -> None:
 
 
 def get_default_vault_path() -> Path:
-    """Determine the default active vault path."""
-    # 1. Environment variable override
-    if settings.VAULT_PATH:
-        p = Path(settings.VAULT_PATH).resolve()
-        return p
-    
-    # 2. Persisted active vault from prior switch
+    """Determine the active vault path, prioritizing user-persisted custom vault selection."""
+    # 1. Persisted active vault from user creation or switch
     persisted = get_persisted_vault_path()
-    if persisted:
+    if persisted and persisted.exists() and persisted.is_dir():
         return persisted
+    
+    # 2. Environment variable override
+    import os
+    env_val = settings.VAULT_PATH or os.environ.get("VAULT_DIRECTORY")
+    if env_val:
+        p = Path(env_val).resolve()
+        if p.exists() and p.is_dir():
+            return p
     
     # 3. Look for VaultSample relative to repository
     backend_dir = Path(__file__).resolve().parent.parent

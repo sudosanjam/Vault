@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
+import Highlight from '@tiptap/extension-highlight';
+import { common, createLowlight } from 'lowlight';
 import { Table } from '@tiptap/extension-table';
 import TableRow from '@tiptap/extension-table-row';
 import TableHeader from '@tiptap/extension-table-header';
@@ -15,6 +18,8 @@ import { Badge } from '../ui/Badge';
 import { EditorToolbar } from './EditorToolbar';
 import { Loader2 } from 'lucide-react';
 
+const lowlight = createLowlight(common);
+
 export const RichEditor: React.FC = () => {
   const {
     activeNote,
@@ -27,9 +32,16 @@ export const RichEditor: React.FC = () => {
   const [linkQuery, setLinkQuery] = useState('');
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const [isTyping, setIsTyping] = useState(false);
-  const typingTimeoutRef = useRef<any>(null);
   const popupRef = useRef<HTMLDivElement>(null);
+
+  const canvasBg = activeNote?.metadata.custom_properties?.canvas_bg || 'plain';
+
+  const handleSetCanvasBg = (bg: string) => {
+    if (activeNote) {
+      const updatedCustom = { ...(activeNote.metadata.custom_properties || {}), canvas_bg: bg };
+      updateActiveNoteMetadata({ custom_properties: updatedCustom });
+    }
+  };
 
   const uploadAndInsertImage = useCallback(async (file: File) => {
     try {
@@ -63,11 +75,17 @@ export const RichEditor: React.FC = () => {
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
-        codeBlock: {
-          HTMLAttributes: {
-            class: 'bg-vault-100 dark:bg-vault-800 p-4 rounded-xl font-mono text-xs border border-vault-200 dark:border-vault-700/60 leading-normal',
-          },
+        codeBlock: false,
+      }),
+      CodeBlockLowlight.configure({
+        lowlight,
+        defaultLanguage: 'python',
+        HTMLAttributes: {
+          class: 'bg-vault-100 dark:bg-vault-850 p-4 rounded-xl font-mono text-xs border border-vault-200 dark:border-vault-700/60 leading-normal hljs my-3',
         },
+      }),
+      Highlight.configure({
+        multicolor: true,
       }),
       Table.configure({ resizable: true }),
       TableRow,
@@ -85,11 +103,6 @@ export const RichEditor: React.FC = () => {
           'prose dark:prose-invert max-w-none focus:outline-none min-h-[550px] px-8 py-6 text-vault-800 dark:text-vault-200 text-sm leading-relaxed selection:bg-[var(--accent-muted)]',
       },
       handleKeyDown: (view, event) => {
-        // Trigger smooth intentional typing animation
-        setIsTyping(true);
-        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-        typingTimeoutRef.current = setTimeout(() => setIsTyping(false), 250);
-
         // Intercept [[ trigger for internal linking
         if (
           event.key === '[' &&
@@ -203,10 +216,16 @@ export const RichEditor: React.FC = () => {
           loadSuggestions('');
         }}
         onInsertImage={handleInsertImage}
+        canvasBg={canvasBg}
+        onChangeCanvasBg={handleSetCanvasBg}
       />
 
-      {/* Editor Canvas Area */}
-      <div className="flex-1 overflow-y-auto relative">
+      {/* Editor Canvas Area with Dynamic Paper Pattern */}
+      <div className={`flex-1 overflow-y-auto relative transition-colors ${
+        canvasBg === 'ruled' ? 'note-bg-ruled' :
+        canvasBg === 'dots' ? 'note-bg-dots' :
+        canvasBg === 'grid' ? 'note-bg-grid' : 'note-bg-plain'
+      }`}>
         <div className="max-w-4xl mx-auto py-8 px-6 sm:px-10">
           {/* Note Metadata Header */}
           <div className="flex items-center gap-2 mb-4">
@@ -231,8 +250,8 @@ export const RichEditor: React.FC = () => {
             className="w-full text-3xl sm:text-4xl font-extrabold tracking-tight text-vault-900 dark:text-vault-50 bg-transparent border-b border-transparent hover:border-vault-200 dark:hover:border-vault-800/80 focus:border-[var(--accent-primary)] focus:outline-none pb-2 mb-6 transition-all placeholder:text-vault-400/50"
           />
 
-          {/* Tiptap Editor Content with Smooth Typing Class */}
-          <div className={`${isTyping ? 'typing-animation-active' : ''} transition-all`}>
+          {/* Tiptap Editor Content */}
+          <div className="w-full">
             <EditorContent editor={editor} />
           </div>
         </div>

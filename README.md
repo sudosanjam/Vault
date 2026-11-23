@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="vault-app/frontend/public/favicon.svg" alt="Vault Logo" width="100" height="96" />
+</p>
+
 # Vault: Local-First Personal Knowledge Graph System
 
 <p align="center">
@@ -31,7 +35,7 @@ Vault is a production-quality, local-first personal knowledge management applica
 | **Emerald** | `#07120d` (Pine Forest) | `#5eead4` (Pastel Mint) | `#a6e3a1` (Sage Green) | Botanical alpine pine |
 | **Amethyst** | `#0e0817` (Deep Cosmic) | `#c084fc` (Radiant Violet) | `#f5c2e7` (Lilac Stardust) | Cosmic cyber lavender |
 
-Switch palettes seamlessly in the **Header Theme Pill** or inside **System Preferences**.
+Switch palettes seamlessly inside **System Preferences** (Preferences & Settings).
 
 ---
 
