@@ -100,7 +100,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   ];
 
   return (
-    <div className="flex flex-wrap items-center gap-1 px-4 py-2 bg-vault-50/70 dark:bg-vault-900/70 backdrop-blur-md border-b border-vault-200 dark:border-vault-800 text-xs shrink-0 select-none">
+    <div className="relative z-30 flex flex-wrap items-center gap-1 px-4 py-2 bg-vault-50 dark:bg-vault-900 border-b border-vault-200 dark:border-vault-800 text-xs shrink-0 select-none">
       {/* Headings Group */}
       <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-vault-200/40 dark:bg-vault-800/40 border border-vault-200/60 dark:border-vault-700/40">
         <button
@@ -251,35 +251,47 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         </button>
 
         {dividerMenuOpen && (
-          <div className="absolute left-0 mt-1.5 w-44 bg-white dark:bg-vault-900 border border-vault-200 dark:border-vault-800 rounded-xl shadow-xl p-1.5 z-50 text-xs space-y-1 animate-scale-in">
+          <div className="absolute left-0 mt-1.5 w-48 bg-white dark:bg-[#151722] border border-vault-200 dark:border-vault-700 rounded-xl shadow-2xl p-1.5 z-50 text-xs space-y-1 animate-scale-in">
             <button
               type="button"
-              onClick={() => insertDivider('solid')}
-              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-vault-100 dark:hover:bg-vault-800 text-left text-vault-800 dark:text-vault-200"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                insertDivider('solid');
+              }}
+              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-vault-100 dark:hover:bg-vault-800 text-left text-vault-800 dark:text-vault-200 cursor-pointer"
             >
               <span>Solid Line</span>
               <span className="w-10 h-[1px] bg-vault-400" />
             </button>
             <button
               type="button"
-              onClick={() => insertDivider('dashed')}
-              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-vault-100 dark:hover:bg-vault-800 text-left text-vault-800 dark:text-vault-200"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                insertDivider('dashed');
+              }}
+              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-vault-100 dark:hover:bg-vault-800 text-left text-vault-800 dark:text-vault-200 cursor-pointer"
             >
               <span>Dashed Line</span>
               <span className="w-10 border-t border-dashed border-vault-400" />
             </button>
             <button
               type="button"
-              onClick={() => insertDivider('dotted')}
-              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-vault-100 dark:hover:bg-vault-800 text-left text-vault-800 dark:text-vault-200"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                insertDivider('dotted');
+              }}
+              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-vault-100 dark:hover:bg-vault-800 text-left text-vault-800 dark:text-vault-200 cursor-pointer"
             >
               <span>Dotted Line</span>
               <span className="w-10 border-t-2 border-dotted border-vault-400" />
             </button>
             <button
               type="button"
-              onClick={() => insertDivider('block')}
-              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-vault-100 dark:hover:bg-vault-800 text-left text-vault-800 dark:text-vault-200"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                insertDivider('block');
+              }}
+              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-vault-100 dark:hover:bg-vault-800 text-left text-vault-800 dark:text-vault-200 cursor-pointer"
             >
               <span>Accent Ribbon</span>
               <span className="w-10 h-1.5 rounded-full bg-gradient-to-r from-[var(--accent-primary)] to-[var(--accent-secondary)]" />
@@ -305,29 +317,30 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           </button>
 
           {bgMenuOpen && (
-            <div className="absolute left-0 mt-1.5 w-48 bg-white dark:bg-vault-900 border border-vault-200 dark:border-vault-800 rounded-xl shadow-xl p-1.5 z-50 text-xs space-y-1 animate-scale-in">
-              <div className="px-2 py-1 text-[10px] font-bold text-vault-400 uppercase tracking-wider">
+            <div className="absolute left-0 mt-1.5 w-52 bg-white dark:bg-[#151722] border border-vault-200 dark:border-vault-700 rounded-xl shadow-2xl p-1.5 z-50 text-xs space-y-1 animate-scale-in">
+              <div className="px-2.5 py-1 text-[10px] font-bold text-vault-400 uppercase tracking-wider">
                 Note Background
               </div>
               {bgOptions.map((opt) => (
                 <button
                   key={opt.id}
                   type="button"
-                  onClick={() => {
+                  onMouseDown={(e) => {
+                    e.preventDefault();
                     onChangeCanvasBg(opt.id);
                     setBgMenuOpen(false);
                   }}
-                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-colors ${
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-left transition-colors cursor-pointer ${
                     canvasBg === opt.id
                       ? 'bg-[var(--accent-muted)] text-[var(--accent-primary)] font-semibold'
-                      : 'text-vault-700 dark:text-vault-300 hover:bg-vault-100 dark:hover:bg-vault-800'
+                      : 'text-vault-700 dark:text-vault-200 hover:bg-vault-100 dark:hover:bg-vault-800'
                   }`}
                 >
                   <div>
-                    <div className="text-xs">{opt.label}</div>
-                    <div className="text-[9px] text-vault-400">{opt.hint}</div>
+                    <div className="text-xs font-medium">{opt.label}</div>
+                    <div className="text-[10px] text-vault-400">{opt.hint}</div>
                   </div>
-                  {canvasBg === opt.id && <span className="text-xs">✓</span>}
+                  {canvasBg === opt.id && <span className="text-xs font-bold text-[var(--accent-primary)]">✓</span>}
                 </button>
               ))}
             </div>

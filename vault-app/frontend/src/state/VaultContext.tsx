@@ -448,9 +448,11 @@ export const VaultProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         note_type: metaUpdates.note_type,
         relations: metaUpdates.relations,
         custom_properties: metaUpdates.custom_properties,
-        expected_hash: activeNote.metadata.content_hash,
       });
-      setActiveNote(updated);
+      setActiveNote(prev => prev ? {
+        ...updated,
+        content: pendingContentRef.current ?? prev.content,
+      } : updated);
       setSaveStatus('saved');
       setLastSavedTime(new Date());
       await refreshTreeAndSummaries();

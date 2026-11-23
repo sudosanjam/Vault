@@ -34,12 +34,25 @@ export const RichEditor: React.FC = () => {
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const popupRef = useRef<HTMLDivElement>(null);
 
-  const canvasBg = activeNote?.metadata.custom_properties?.canvas_bg || 'plain';
+  const [canvasBg, setCanvasBg] = useState<string>(() => {
+    return activeNote?.metadata.custom_properties?.canvas_bg || localStorage.getItem('vault_default_canvas') || 'plain';
+  });
+
+  useEffect(() => {
+    if (activeNote) {
+      const savedBg = activeNote.metadata.custom_properties?.canvas_bg || localStorage.getItem('vault_default_canvas') || 'plain';
+      setCanvasBg(savedBg);
+    }
+  }, [activeNote?.metadata.id]);
 
   const handleSetCanvasBg = (bg: string) => {
+    setCanvasBg(bg);
+    localStorage.setItem('vault_default_canvas', bg);
     if (activeNote) {
       const updatedCustom = { ...(activeNote.metadata.custom_properties || {}), canvas_bg: bg };
-      updateActiveNoteMetadata({ custom_properties: updatedCustom });
+      updateActiveNoteMetadata({ custom_properties: updatedCustom }).catch((err) => {
+        console.warn('Could not persist canvas_bg to note:', err);
+      });
     }
   };
 
