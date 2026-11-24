@@ -31,9 +31,9 @@ VENV_PYTHON = os.path.join(BACKEND_DIR, "venv", "Scripts", "python.exe")
 if not os.path.exists(VENV_PYTHON):
     VENV_PYTHON = sys.executable
 
-ICON_PATH = os.path.join(SCRIPT_DIR, "vault.ico")
+ICON_PATH = os.path.join(WORKSPACE_ROOT, "vault.ico")
 if not os.path.exists(ICON_PATH):
-    ICON_PATH = os.path.join(WORKSPACE_ROOT, "vault.ico")
+    ICON_PATH = os.path.join(SCRIPT_DIR, "vault.ico")
 
 LOG_FILE = os.path.join(BACKEND_DIR, "vault_server.log")
 PID_FILE = os.path.join(BACKEND_DIR, ".vault.pid")

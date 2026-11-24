@@ -384,7 +384,7 @@ if (-not (Test-Path $DistIndex)) {
     throw "Frontend build artifact dist\index.html was not generated. Please inspect build output."
 }
 
-# Compile Vault Launcher executable
+# Compile Vault executables (vault.exe, setup.exe, update.exe)
 $CscPath = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
 if (-not (Test-Path $CscPath)) {
     $CscPath = "C:\Windows\Microsoft.NET\Framework\v4.0.30319\csc.exe"
@@ -398,6 +398,28 @@ if ((Test-Path $CscPath) -and (Test-Path $VaultLauncherCs)) {
     & $CscPath /nologo /target:winexe $iconArg /out:"$VaultExe" "$VaultLauncherCs"
     if (Test-Path $VaultExe) {
         Write-Success "Generated launcher executable: vault.exe"
+    }
+}
+
+$SetupLauncherCs = Join-Path $ProjectRoot "vault-app\launchers\SetupLauncher.cs"
+$SetupExe = Join-Path $ProjectRoot "setup.exe"
+$SetupIco = Join-Path $ProjectRoot "setup.ico"
+if ((Test-Path $CscPath) -and (Test-Path $SetupLauncherCs)) {
+    $setupIconArg = if (Test-Path $SetupIco) { "/win32icon:`"$SetupIco`"" } else { "" }
+    & $CscPath /nologo /target:exe $setupIconArg /out:"$SetupExe" "$SetupLauncherCs"
+    if (Test-Path $SetupExe) {
+        Write-Success "Generated setup executable: setup.exe"
+    }
+}
+
+$UpdateLauncherCs = Join-Path $ProjectRoot "vault-app\launchers\UpdateLauncher.cs"
+$UpdateExe = Join-Path $ProjectRoot "update.exe"
+$UpdateIco = Join-Path $ProjectRoot "update.ico"
+if ((Test-Path $CscPath) -and (Test-Path $UpdateLauncherCs)) {
+    $updateIconArg = if (Test-Path $UpdateIco) { "/win32icon:`"$UpdateIco`"" } else { "" }
+    & $CscPath /nologo /target:exe $updateIconArg /out:"$UpdateExe" "$UpdateLauncherCs"
+    if (Test-Path $UpdateExe) {
+        Write-Success "Generated update executable: update.exe"
     }
 }
 

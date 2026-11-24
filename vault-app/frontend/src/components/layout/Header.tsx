@@ -110,6 +110,7 @@ export const Header: React.FC = () => {
               <img
                 src="/logo.png"
                 alt="Vault"
+                style={{ imageRendering: 'pixelated' }}
                 className={`w-6 h-6 object-contain transition-transform duration-500 ${isRefreshing ? 'animate-spin' : ''}`}
               />
             </div>

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="vault-app/frontend/public/logo.png" alt="Vault Logo" width="120" height="120" />
+  <img src="vault-app/frontend/public/logo.png" alt="Vault Logo" width="128" height="128" style="image-rendering: pixelated;" />
 </p>
 
 # Vault: Local-First Personal Knowledge Graph System
@@ -15,11 +15,10 @@ Vault is a production-quality, local-first personal knowledge management applica
 ## Quick Start (Classic Game Executables & Scripts)
 
 ### Windows Executable Suite (Classic Game Style)
-- **First-Time Setup:** Run [`setup.exe`](setup.exe)
+- **First-Time Setup:** Run [`setup.exe`](setup.exe) ([`setup.ico`](setup.ico))
   - Vintage PC installer console that validates Python 3 and Node.js, installs dependencies, builds the frontend, links attachments, and **generates `vault.exe`**.
-- **Launch Vault:** Double-click [`vault.exe`](vault.exe) (generated upon running `setup.exe`).
-- **Official Icon:** Multi-resolution executable & desktop icon: [`vault.ico`](vault.ico)
-- **Update Application:** Run [`update.exe`](update.exe)
+- **Launch Vault:** Double-click [`vault.exe`](vault.exe) ([`vault.ico`](vault.ico)) (generated upon running `setup.exe`).
+- **Update Application:** Run [`update.exe`](update.exe) ([`update.ico`](update.ico))
   - Checks GitHub (`sudosanjam/Vault`) for incoming patches, compares commits, pulls updates, rebuilds the application, and relaunches `vault.exe`.
 - **Scripts Alternative:** [`start.bat`](start.bat) / [`start.ps1`](start.ps1) and [`stop.bat`](stop.bat) / [`stop.ps1`](stop.ps1).
 
